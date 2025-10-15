@@ -11,9 +11,7 @@
 
 namespace CustomCRM;
 
-use FluentCrm\Framework\Support\Arr;
 use FluentCampaign\App\Services\Commerce\Commerce;
-use FluentCrm\App\Models\Subscriber;
 
 /**
  * Class EDDSubscriptionRules
@@ -39,6 +37,9 @@ class EDDSubscriptionRules {
 
 		// Apply conditional subscription rules in automations.
 		add_filter( 'fluentcrm_automation_conditions_assess_edd_subscriptions', [ $this, 'assess_subscription_condition' ], 10, 3 );
+
+		// Register AJAX endpoint for product selector.
+		add_filter( 'fluentcrm_ajax_options_product_selector_edd_subscriptions', [ $this, 'getProductSelectorOptions' ], 10, 3 );
 	}
 
 
@@ -66,24 +67,66 @@ class EDDSubscriptionRules {
 	/**
 	 * Get subscription filter items.
 	 *
+	 * Creates a separate filter for each subscription status.
+	 *
 	 * @return array<int<0,max>,array<string,mixed>>
 	 */
 	public function getConditionItems() {
-		return [
-			[
-				'value'            => 'has_active_subscription',
-				'label'            => __( 'Has Active Subscription', 'fluent-crm-custom-features' ),
+		$statuses = [
+			'any'       => __( 'Any Status', 'fluent-crm-custom-features' ),
+			'active'    => __( 'Active', 'fluent-crm-custom-features' ),
+			'expired'   => __( 'Expired', 'fluent-crm-custom-features' ),
+			'cancelled' => __( 'Cancelled', 'fluent-crm-custom-features' ),
+			'pending'   => __( 'Pending', 'fluent-crm-custom-features' ),
+			'failing'   => __( 'Failing', 'fluent-crm-custom-features' ),
+			'completed' => __( 'Completed', 'fluent-crm-custom-features' ),
+		];
+
+		$items = [];
+
+		foreach ( $statuses as $status => $label ) {
+			$items[] = [
+				'value'            => 'has_subscription_' . $status,
+				'label'            => sprintf( __( 'Has %s Subscription', 'fluent-crm-custom-features' ), $label ),
 				'type'             => 'selections',
 				'component'        => 'product_selector',
+				'option_key'       => 'product_selector_edd_subscriptions',
 				'is_multiple'      => true,
 				'disabled'         => ! Commerce::isEnabled( 'edd' ) || ! defined( 'EDD_RECURRING_VERSION' ),
-				'help'             => __( 'Filter contacts who have an active subscription for selected products', 'fluent-crm-custom-features' ),
+				'help'             => sprintf( __( 'Filter contacts who have a %s subscription for selected products', 'fluent-crm-custom-features' ), strtolower( $label ) ),
 				'custom_operators' => [
-					'in'     => __( 'Has Active', 'fluent-crm-custom-features' ),
-					'not_in' => __( 'Does Not Have Active', 'fluent-crm-custom-features' ),
+			'in'     => sprintf( __( 'Has %s', 'fluent-crm-custom-features' ), $label ),
+			'not_in' => sprintf( __( 'Does Not Have %s', 'fluent-crm-custom-features' ), $label ),
 				],
-			],
+			];
+		}
+
+		// Add special "expiring soon" filters with fixed timeframes.
+		$expiring_timeframes = [
+			7  => __( '7 Days', 'fluent-crm-custom-features' ),
+			14 => __( '14 Days', 'fluent-crm-custom-features' ),
+			30 => __( '30 Days', 'fluent-crm-custom-features' ),
+			60 => __( '60 Days', 'fluent-crm-custom-features' ),
 		];
+
+		foreach ( $expiring_timeframes as $days => $label ) {
+			$items[] = [
+				'value'            => 'subscription_expiring_' . $days . 'd',
+				'label'            => sprintf( __( 'Subscription Expiring in %s', 'fluent-crm-custom-features' ), $label ),
+				'type'             => 'selections',
+				'component'        => 'product_selector',
+				'option_key'       => 'product_selector_edd_subscriptions',
+				'is_multiple'      => true,
+				'disabled'         => ! Commerce::isEnabled( 'edd' ) || ! defined( 'EDD_RECURRING_VERSION' ),
+				'help'             => sprintf( __( 'Filter contacts whose active subscription will expire within %s', 'fluent-crm-custom-features' ), strtolower( $label ) ),
+				'custom_operators' => [
+					'in'     => sprintf( __( 'Expiring in %s', 'fluent-crm-custom-features' ), $label ),
+					'not_in' => sprintf( __( 'Not Expiring in %s', 'fluent-crm-custom-features' ), $label ),
+				],
+			];
+		}
+
+		return $items;
 	}
 
 	/**
@@ -106,57 +149,276 @@ class EDDSubscriptionRules {
 				continue;
 			}
 
-			if ( 'has_active_subscription' === $property && ! defined( 'EDD_RECURRING_VERSION' ) ) {
+			if ( ! defined( 'EDD_RECURRING_VERSION' ) ) {
 				continue;
 			}
 
-			switch ( $filter['property'] ) {
-				case 'has_active_subscription':
-					$product_ids = (array) $filter['value'];
-					$operator    = $filter['operator'];
+			// Handle "expiring soon" filters separately (e.g., subscription_expiring_7d, subscription_expiring_30d).
+			if ( strpos( $property, 'subscription_expiring_' ) === 0 ) {
+				$this->applyExpiringFilter( $query, $filter, $property );
+				continue;
+			}
 
-					if ( empty( $product_ids ) ) {
-						break;
-					}
+			// Check if this is a subscription status filter.
+			if ( strpos( $property, 'has_subscription_' ) !== 0 ) {
+				continue;
+			}
 
-					$placeholders = implode( ',', array_fill( 0, count( $product_ids ), '%d' ) );
+			// Extract status from property name (e.g., 'has_subscription_active' → 'active').
+			$status = str_replace( 'has_subscription_', '', $property );
 
-					if ( 'in' === $operator ) {
-						// Has active subscription - query directly against EDD tables.
-						$query->whereRaw(
-							$wpdb->prepare(
-								"EXISTS (
-									SELECT 1
-									FROM {$wpdb->prefix}edd_subscriptions AS sub
-									JOIN {$wpdb->prefix}edd_customers AS cust ON cust.id = sub.customer_id
-									WHERE (cust.user_id = {$wpdb->prefix}fc_subscribers.user_id OR cust.email = {$wpdb->prefix}fc_subscribers.email)
-									AND sub.product_id IN ($placeholders)
-									AND sub.status = %s
-								)",
-								array_merge( $product_ids, [ 'active' ] )
-							)
-						);
-					} else {
-						// Does not have active subscription.
-						$query->whereRaw(
-							$wpdb->prepare(
-								"NOT EXISTS (
-									SELECT 1
-									FROM {$wpdb->prefix}edd_subscriptions AS sub
-									JOIN {$wpdb->prefix}edd_customers AS cust ON cust.id = sub.customer_id
-									WHERE (cust.user_id = {$wpdb->prefix}fc_subscribers.user_id OR cust.email = {$wpdb->prefix}fc_subscribers.email)
-									AND sub.product_id IN ($placeholders)
-									AND sub.status = %s
-								)",
-								array_merge( $product_ids, [ 'active' ] )
-							)
-						);
-					}
-					break;
+			$product_values = (array) $filter['value'];
+			$operator       = $filter['operator'] ?? 'in';
+
+			if ( empty( $product_values ) ) {
+				continue;
+			}
+
+			// Determine statuses to filter - 'any' means all statuses (no filter).
+			if ( 'any' === $status ) {
+				$statuses = []; // Empty array = no status filter.
+			} else {
+				$statuses = [ $status ];
+			}
+
+			// Parse product values - may be "download_id" or "download_id:price_id" format.
+			$conditions = [];
+			foreach ( $product_values as $value ) {
+				if ( strpos( $value, ':' ) !== false ) {
+					// Variable pricing: "download_id:price_id".
+					list( $download_id, $price_id ) = explode( ':', $value, 2 );
+					$conditions[] = [
+						'download_id' => (int) $download_id,
+						'price_id'    => (int) $price_id,
+					];
+				} else {
+					// Single price product: just download_id.
+					$conditions[] = [
+						'download_id' => (int) $value,
+						'price_id'    => null,
+					];
+				}
+			}
+
+			// Build WHERE conditions for product/price combinations.
+			$where_conditions = [];
+			$prepare_values   = [];
+
+			foreach ( $conditions as $condition ) {
+				if ( null === $condition['price_id'] ) {
+					// No price_id specified - match ALL price variants for this product.
+					$where_conditions[] = '(sub.product_id = %d)';
+					$prepare_values[]   = $condition['download_id'];
+				} else {
+					// Specific price variant - match on both product_id AND price_id.
+					$where_conditions[] = '(sub.product_id = %d AND sub.price_id = %d)';
+					$prepare_values[]   = $condition['download_id'];
+					$prepare_values[]   = $condition['price_id'];
+				}
+			}
+
+			$where_clause = '(' . implode( ' OR ', $where_conditions ) . ')';
+
+			// Build status filter if statuses are specified.
+			$status_filter = '';
+			if ( ! empty( $statuses ) ) {
+				$status_placeholders = implode( ', ', array_fill( 0, count( $statuses ), '%s' ) );
+				$prepare_values = array_merge( $prepare_values, $statuses );
+				$status_filter = "AND sub.status IN ($status_placeholders)";
+			}
+
+			// PERFORMANCE OPTIMIZATION: Query EDD tables first (4k subs), then filter subscribers.
+			// This is 70x faster than correlated subquery approach (2 seconds vs 142 seconds).
+			// NOTE: Don't use DISTINCT here - multiple customers may share same user_id/email.
+			// We'll deduplicate when building the whereIn arrays.
+			$matching_sql = $wpdb->prepare(
+				"SELECT cust.user_id, cust.email
+				FROM {$wpdb->prefix}edd_subscriptions AS sub
+				INNER JOIN {$wpdb->prefix}edd_customers AS cust ON cust.id = sub.customer_id
+				WHERE $where_clause
+				$status_filter",
+				$prepare_values
+			);
+
+			$results = $wpdb->get_results( $matching_sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+
+			// Extract user_ids and emails.
+			$user_ids = [];
+			$emails   = [];
+
+			foreach ( $results as $row ) {
+				if ( ! empty( $row->user_id ) && $row->user_id > 0 ) {
+					$user_ids[] = (int) $row->user_id;
+				}
+				if ( ! empty( $row->email ) ) {
+					$emails[] = $row->email;
+				}
+			}
+
+			// Deduplicate arrays.
+			$user_ids = array_values( array_unique( $user_ids ) );
+			$emails   = array_values( array_unique( $emails ) );
+
+			if ( 'in' === $operator ) {
+				// Has subscription with specified status(es).
+				if ( ! empty( $user_ids ) || ! empty( $emails ) ) {
+					$query->where(
+						function ( $q ) use ( $user_ids, $emails ) {
+							if ( ! empty( $user_ids ) ) {
+								$q->whereIn( 'user_id', $user_ids );
+							}
+							if ( ! empty( $emails ) ) {
+								$q->orWhereIn( 'email', $emails );
+							}
+						}
+					);
+				} else {
+					// No matches - return empty result.
+					$query->where( 'id', '=', 0 );
+				}
+			} else {
+				// Does NOT have subscription with specified status(es).
+				if ( ! empty( $user_ids ) || ! empty( $emails ) ) {
+					$query->where(
+						function ( $q ) use ( $user_ids, $emails ) {
+							if ( ! empty( $user_ids ) ) {
+								$q->whereNotIn( 'user_id', $user_ids );
+							}
+							if ( ! empty( $emails ) ) {
+								$q->whereNotIn( 'email', $emails );
+							}
+						}
+					);
+				}
+				// If no matches found, all subscribers match "does not have".
 			}
 		}
 
 		return $query;
+	}
+
+	/**
+	 * Apply "expiring soon" filter to the query.
+	 *
+	 * Filters for active subscriptions that will expire within the specified number of days.
+	 *
+	 * @param \FluentCrm\Framework\Database\Query\Builder $query Query builder instance.
+	 * @param array                                       $filter Filter configuration.
+	 * @param string                                      $property Property name (e.g., subscription_expiring_30d).
+	 * @return void
+	 */
+	protected function applyExpiringFilter( $query, $filter, $property ) {
+		global $wpdb;
+
+		// Extract days from property name (e.g., 'subscription_expiring_30d' → 30).
+		preg_match( '/subscription_expiring_(\d+)d/', $property, $matches );
+		$days = isset( $matches[1] ) ? (int) $matches[1] : 30;
+
+		$product_values = (array) $filter['value'];
+		$operator       = $filter['operator'] ?? 'in';
+
+		if ( empty( $product_values ) ) {
+			return;
+		}
+
+		// Parse product values - may be "download_id" or "download_id:price_id" format.
+		$conditions = [];
+		foreach ( $product_values as $value ) {
+			if ( strpos( $value, ':' ) !== false ) {
+				list( $download_id, $price_id ) = explode( ':', $value, 2 );
+				$conditions[] = [
+					'download_id' => (int) $download_id,
+					'price_id'    => (int) $price_id,
+				];
+			} else {
+				$conditions[] = [
+					'download_id' => (int) $value,
+					'price_id'    => null,
+				];
+			}
+		}
+
+		// Build WHERE conditions for product/price combinations.
+		$where_conditions = [];
+		$prepare_values   = [];
+
+		foreach ( $conditions as $condition ) {
+			if ( null === $condition['price_id'] ) {
+				$where_conditions[] = '(sub.product_id = %d)';
+				$prepare_values[]   = $condition['download_id'];
+			} else {
+				$where_conditions[] = '(sub.product_id = %d AND sub.price_id = %d)';
+				$prepare_values[]   = $condition['download_id'];
+				$prepare_values[]   = $condition['price_id'];
+			}
+		}
+
+		$where_clause = '(' . implode( ' OR ', $where_conditions ) . ')';
+
+		// Calculate date range: now to now + days.
+		$now       = current_time( 'mysql' );
+		$future    = date( 'Y-m-d 23:59:59', strtotime( "+{$days} days", current_time( 'timestamp' ) ) );
+		$prepare_values[] = $now;
+		$prepare_values[] = $future;
+
+		$matching_sql = $wpdb->prepare(
+			"SELECT cust.user_id, cust.email
+			FROM {$wpdb->prefix}edd_subscriptions AS sub
+			INNER JOIN {$wpdb->prefix}edd_customers AS cust ON cust.id = sub.customer_id
+			WHERE $where_clause
+			AND sub.status = 'active'
+			AND sub.expiration >= %s
+			AND sub.expiration <= %s",
+			$prepare_values
+		);
+
+		$results = $wpdb->get_results( $matching_sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+
+		// Extract and deduplicate user_ids and emails.
+		$user_ids = [];
+		$emails   = [];
+
+		foreach ( $results as $row ) {
+			if ( ! empty( $row->user_id ) && $row->user_id > 0 ) {
+				$user_ids[] = (int) $row->user_id;
+			}
+			if ( ! empty( $row->email ) ) {
+				$emails[] = $row->email;
+			}
+		}
+
+		$user_ids = array_values( array_unique( $user_ids ) );
+		$emails   = array_values( array_unique( $emails ) );
+
+		if ( 'in' === $operator ) {
+			if ( ! empty( $user_ids ) || ! empty( $emails ) ) {
+				$query->where(
+					function ( $q ) use ( $user_ids, $emails ) {
+						if ( ! empty( $user_ids ) ) {
+							$q->whereIn( 'user_id', $user_ids );
+						}
+						if ( ! empty( $emails ) ) {
+							$q->orWhereIn( 'email', $emails );
+						}
+					}
+				);
+			} else {
+				$query->where( 'id', '=', 0 );
+			}
+		} else {
+			if ( ! empty( $user_ids ) || ! empty( $emails ) ) {
+				$query->where(
+					function ( $q ) use ( $user_ids, $emails ) {
+						if ( ! empty( $user_ids ) ) {
+							$q->whereNotIn( 'user_id', $user_ids );
+						}
+						if ( ! empty( $emails ) ) {
+							$q->whereNotIn( 'email', $emails );
+						}
+					}
+				);
+			}
+		}
 	}
 
 	/**
@@ -169,18 +431,31 @@ class EDDSubscriptionRules {
 	 */
 	public function assess_subscription_condition( $result, $conditions, $subscriber ) {
 		foreach ( $conditions as $condition ) {
-			if ( empty( $condition['data_key'] ) || 'has_active_subscription' !== $condition['data_key'] ) {
+			$data_key = $condition['data_key'] ?? '';
+
+			// Check if this is a subscription filter using pattern matching.
+			if ( empty( $data_key ) || strpos( $data_key, 'has_subscription_' ) !== 0 ) {
 				continue;
 			}
 
-			$product_ids = (array) $condition['data_value'];
-			$operator    = $condition['operator'];
+			$operator = $condition['operator'];
 
-			if ( ! defined( 'EDD_RECURRING_VERSION' ) || empty( $product_ids ) ) {
+			if ( ! defined( 'EDD_RECURRING_VERSION' ) ) {
 				return $result;
 			}
 
-			$has_subscription = $this->has_active_subscription( $subscriber, $product_ids );
+			// Extract status from property name (e.g., 'has_subscription_active' → 'active').
+			$status = str_replace( 'has_subscription_', '', $data_key );
+
+			// Products are in 'data_value', status extracted from filter name.
+			$product_ids = (array) $condition['data_value'];
+			$statuses    = [ $status ];
+
+			if ( empty( $product_ids ) ) {
+				return $result;
+			}
+
+			$has_subscription = $this->has_subscription_with_status( $subscriber, $product_ids, $statuses );
 
 			if ( ( 'in' === $operator && ! $has_subscription ) || ( 'not_in' === $operator && $has_subscription ) ) {
 				return false;
@@ -191,13 +466,14 @@ class EDDSubscriptionRules {
 	}
 
 	/**
-	 * Check if subscriber has active subscription.
+	 * Check if subscriber has subscription with specified status(es).
 	 *
 	 * @param \FluentCrm\App\Models\Subscriber $subscriber Subscriber instance.
-	 * @param array                            $product_ids Product IDs to check.
-	 * @return bool Whether subscriber has active subscription.
+	 * @param array                            $product_values Product values to check (may be "download_id" or "download_id:price_id").
+	 * @param array                            $statuses Subscription statuses to check (default: ['active']).
+	 * @return bool Whether subscriber has subscription with specified status.
 	 */
-	protected function has_active_subscription( $subscriber, $product_ids ) {
+	protected function has_subscription_with_status( $subscriber, $product_values, $statuses = [ 'active' ] ) {
 		global $wpdb;
 
 		$user_id = $subscriber->user_id;
@@ -219,13 +495,139 @@ class EDDSubscriptionRules {
 			return false;
 		}
 
+		// Parse product values - may be "download_id" or "download_id:price_id" format.
+		$conditions = [];
+		foreach ( $product_values as $value ) {
+			if ( strpos( $value, ':' ) !== false ) {
+				// Variable pricing: "download_id:price_id".
+				list( $download_id, $price_id ) = explode( ':', $value, 2 );
+				$conditions[] = [
+			'download_id' => (int) $download_id,
+			'price_id'    => (int) $price_id,
+				];
+			} else {
+				// Single price product: just download_id.
+				$conditions[] = [
+			'download_id' => (int) $value,
+			'price_id'    => null,
+				];
+			}
+		}
+
+		// Build WHERE conditions for product/price combinations.
+		$where_conditions = [];
+		$prepare_values   = [ $customer->id ];
+
+		foreach ( $conditions as $condition ) {
+			if ( null === $condition['price_id'] ) {
+				// No price_id specified - match ALL price variants for this product.
+				$where_conditions[] = '(product_id = %d)';
+				$prepare_values[]   = $condition['download_id'];
+			} else {
+				// Specific price variant - match on both product_id AND price_id.
+				$where_conditions[] = '(product_id = %d AND price_id = %d)';
+				$prepare_values[]   = $condition['download_id'];
+				$prepare_values[]   = $condition['price_id'];
+			}
+		}
+
+		$where_clause = '(' . implode( ' OR ', $where_conditions ) . ')';
+
+		// Build status filter if statuses are specified.
+		$status_filter = '';
+		if ( ! empty( $statuses ) ) {
+			$status_placeholders = implode( ', ', array_fill( 0, count( $statuses ), '%s' ) );
+			$prepare_values      = array_merge( $prepare_values, $statuses );
+			$status_filter = 'AND status IN (' . $status_placeholders . ')';
+		}
+
 		$subscription = $wpdb->get_row(
 			$wpdb->prepare(
-				'SELECT id FROM ' . $wpdb->prefix . 'edd_subscriptions WHERE customer_id = %d AND product_id IN (' . implode( ',', array_fill( 0, count( $product_ids ), '%d' ) ) . ') AND status = %s LIMIT 1',
-				array_merge( [ $customer->id ], $product_ids, [ 'active' ] )
+				'SELECT id FROM ' . $wpdb->prefix . 'edd_subscriptions WHERE customer_id = %d AND ' . $where_clause . ' ' . $status_filter . ' LIMIT 1',
+				$prepare_values
 			)
 		);
 
 		return (bool) $subscription;
+	}
+
+	/**
+	 * Get product selector options for AJAX dropdown.
+	 *
+	 * Returns EDD products with variable pricing in format: download_id:price_id
+	 *
+	 * @param array $options      Existing options array (unused, required by filter signature).
+	 * @param string $search      Search term for filtering products.
+	 * @param array  $includedIds IDs to include (unused, required by filter signature).
+	 * @return array Product options for dropdown.
+	 */
+	public function getProductSelectorOptions( $options, $search = '', $includedIds = [] ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found
+
+		$download_ids = [];
+
+		// Query 1: Search results (up to 50).
+		$args = [
+			'post_type'      => 'download',
+			'fields'         => 'ids',
+			'posts_per_page' => 50,
+			'post_status'    => 'publish',
+			'no_found_rows'  => true,
+		];
+
+		if ( ! empty( $search ) ) {
+			$args['s'] = sanitize_text_field( $search );
+			// When searching, use WordPress relevance ordering (default).
+		} else {
+			// When NOT searching, sort alphabetically.
+			$args['orderby'] = 'title';
+			$args['order']   = 'ASC';
+		}
+
+		$search_results = get_posts( $args );
+		$download_ids   = array_merge( $download_ids, $search_results );
+
+		// Query 2: IncludedIds (ensure pre-selected items are always included).
+		if ( ! empty( $includedIds ) ) {
+			$included_ids = array_map( 'intval', (array) $includedIds );
+			$download_ids = array_merge( $download_ids, $included_ids );
+		}
+
+		// Deduplicate and preserve order.
+		$download_ids = array_values( array_unique( $download_ids ) );
+		$result       = [];
+
+		foreach ( $download_ids as $download_id ) {
+			$download = new \EDD_Download( $download_id );
+
+			// Skip if download doesn't exist.
+			if ( ! $download->ID ) {
+				continue;
+			}
+
+			$has_variable_pricing = edd_has_variable_prices( $download->ID );
+
+			if ( $has_variable_pricing ) {
+				// Get all price variations.
+				$prices = edd_get_variable_prices( $download->ID );
+
+				if ( ! empty( $prices ) ) {
+			foreach ( $prices as $price_id => $price ) {
+				$price_name = ! empty( $price['name'] ) ? $price['name'] : sprintf( 'Price Option %d', $price_id );
+				$result[]   = [
+					'id'    => $download->ID . ':' . $price_id,
+					'title' => $download->post_title . ' - ' . $price_name,
+				];
+			}
+				}
+			} else {
+				// Single price product.
+				$result[] = [
+			'id'    => (string) $download->ID,
+			'title' => $download->post_title,
+				];
+			}
+		}
+
+		return $result;
 	}
 }
