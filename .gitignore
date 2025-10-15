@@ -1,0 +1,48 @@
+# Dependencies
+/vendor/
+/vendor-prefixed/
+/node_modules/
+
+# Composer
+composer.lock
+composer.phar
+
+# Strauss
+strauss.phar
+
+# Build artifacts
+/build/
+/dist/
+
+# Release artifacts
+*.zip
+custom-automations/
+package-lock.json
+
+# IDE files
+.idea/
+.vscode/
+*.sublime-*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+/logs/
+
+# PHP CS Fixer
+.php_cs.cache
+.php-cs-fixer.cache
+phpcs-report.xml
+
+# Testing
+/coverage/
+.phpunit.result.cache
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~

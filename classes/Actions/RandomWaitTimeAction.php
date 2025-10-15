@@ -27,6 +27,7 @@ class RandomWaitTimeAction extends \FluentCrm\App\Services\Funnel\Actions\WaitTi
 
 		add_filter( 'fluent_crm/funnel_seq_delay_in_seconds', [ $this, 'setDelayInSeconds' ], 10, 4 );
 
+		// phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
 		add_filter( 'fluentcrm_funnel_sequence_saving_' . $this->actionName, [ $this, 'savingAction' ], 10, 2 );
 	}
 
@@ -38,7 +39,7 @@ class RandomWaitTimeAction extends \FluentCrm\App\Services\Funnel\Actions\WaitTi
 	public function getBlock() {
 		$block = parent::getBlock();
 
-		$customizeBlock = [
+		$customize_block = [
 			'settings' => [
 				'wait_time_amount'     => 1,
 				'wait_time_amount_min' => '',
@@ -46,14 +47,14 @@ class RandomWaitTimeAction extends \FluentCrm\App\Services\Funnel\Actions\WaitTi
 			],
 		];
 
-		return array_merge_recursive( $block, $customizeBlock );
+		return array_merge_recursive( $block, $customize_block );
 	}
 
 	/**
 	 * Save the sequence settings.
 	 *
-	 * @param array<string,string|array> $sequence
-	 * @param array<string,string|array> $funnel
+	 * @param array<string,string|array> $sequence The sequence settings.
+	 * @param array<string,string|array> $funnel The funnel settings.
 	 *
 	 * @return array<string,string|array>
 	 */
@@ -62,20 +63,20 @@ class RandomWaitTimeAction extends \FluentCrm\App\Services\Funnel\Actions\WaitTi
 		$max  = Arr::get( $sequence, 'settings.wait_time_amount_max' );
 		$unit = Arr::get( $sequence, 'settings.wait_time_unit' );
 
-		if ( $min >= 0 & $max > 0 ) {
+		if ( $min >= 0 && $max > 0 ) {
 			$sequence['settings']['wait_time_amount'] = $max;
 
-			$maxDelay = 0;
+			$max_delay = 0;
 
-			if ( $unit === 'hours' ) {
-				$maxDelay = $max * 60 * 60;
-			} elseif ( $unit === 'minutes' ) {
-				$maxDelay = $max * 60;
-			} elseif ( $unit === 'days' ) {
-				$maxDelay = $max * 60 * 60 * 24;
+			if ( 'hours' === $unit ) {
+				$max_delay = $max * 60 * 60;
+			} elseif ( 'minutes' === $unit ) {
+				$max_delay = $max * 60;
+			} elseif ( 'days' === $unit ) {
+				$max_delay = $max * 60 * 60 * 24;
 			}
 
-			$sequence['delay'] = $maxDelay;
+			$sequence['delay'] = $max_delay;
 		}
 
 		return $sequence;
@@ -84,8 +85,8 @@ class RandomWaitTimeAction extends \FluentCrm\App\Services\Funnel\Actions\WaitTi
 	/**
 	 * Get the action settings.
 	 *
-	 * @param array<string,string|array> $sequence
-	 * @param array<string,string|array> $funnel
+	 * @param array<string,string|array> $sequence The sequence settings.
+	 * @param array<string,string|array> $funnel The funnel settings.
 	 *
 	 * @return array<string,string|array>
 	 */
@@ -101,39 +102,39 @@ class RandomWaitTimeAction extends \FluentCrm\App\Services\Funnel\Actions\WaitTi
 	 * @return array<string,string|array>
 	 */
 	public function getBlockFields() {
-		$blockFields = parent::getBlockFields();
+		$block_fields = parent::getBlockFields();
 
-		$blockFields['fields']['wait_type']['options'][0]['title'] = __( 'Wait for fixed or random period', 'fluent-crm' );
+		$block_fields['fields']['wait_type']['options'][0]['title'] = __( 'Wait for fixed or random period', 'fluent-crm-custom-features' );
 
-		$blockFields['fields']['wait_time_unit']['options'] = array_merge(
+		$block_fields['fields']['wait_time_unit']['options'] = array_merge(
 			[
 				[
 					'id'    => 'months',
-					'title' => __( 'Months', 'fluent-crm' ),
+					'title' => __( 'Months', 'fluent-crm-custom-features' ),
 				],
 				[
 					'id'    => 'weeks',
-					'title' => __( 'Weeks', 'fluent-crm' ),
+					'title' => __( 'Weeks', 'fluent-crm-custom-features' ),
 				],
 			],
-			$blockFields['fields']['wait_time_unit']['options'],
+			$block_fields['fields']['wait_time_unit']['options'],
 			[
 				[
 					'id'    => 'seconds',
-					'title' => __( 'Seconds', 'fluent-crm' ),
+					'title' => __( 'Seconds', 'fluent-crm-custom-features' ),
 				],
 			]
 		);
 
 		// Insert our min/max fields after the first field using array_splice
-		$blockFields['fields'] = array_merge(
-			array_slice( $blockFields['fields'], 0, 2 ), // First part, up to the first item inclusive
+		$block_fields['fields'] = array_merge(
+			array_slice( $block_fields['fields'], 0, 2 ), // First part, up to the first item inclusive
 			[
 				'wait_time_amount_min' => [
-					'label'         => __( 'Random Delay - Min', 'fluent-crm' ),
+					'label'         => __( 'Random Delay - Min', 'fluent-crm-custom-features' ),
 					'type'          => 'input-number',
 					'wrapper_class' => 'fc_2col_inline pad-r-20',
-					'inline_help'   => __( 'Set min for random delay.', 'fluent-crm' ),
+					'inline_help'   => __( 'Set min for random delay.', 'fluent-crm-custom-features' ),
 					'dependency'    => [
 						'depends_on' => 'wait_type',
 						'value'      => 'unit_wait',
@@ -141,10 +142,10 @@ class RandomWaitTimeAction extends \FluentCrm\App\Services\Funnel\Actions\WaitTi
 					],
 				],
 				'wait_time_amount_max' => [
-					'label'         => __( 'Random Delay - Max', 'fluent-crm' ),
+					'label'         => __( 'Random Delay - Max', 'fluent-crm-custom-features' ),
 					'type'          => 'input-number',
 					'wrapper_class' => 'fc_2col_inline pad-r-20',
-					'inline_help'   => __( 'Max required for random delay.', 'fluent-crm' ),
+					'inline_help'   => __( 'Max required for random delay.', 'fluent-crm-custom-features' ),
 					'dependency'    => [
 						'depends_on' => 'wait_type',
 						'value'      => 'unit_wait',
@@ -152,69 +153,66 @@ class RandomWaitTimeAction extends \FluentCrm\App\Services\Funnel\Actions\WaitTi
 					],
 				],
 			],
-			array_slice( $blockFields['fields'], 2 ) // Remaining part, from the second item to the end
+			array_slice( $block_fields['fields'], 2 ) // Remaining part, from the second item to the end
 		);
 
-		// Relabel the Wait Time field
-		// $blockFields['fields']['wait_time_amount']['label'] = __( 'Delay', 'fluent-crm' );
-
-		return $blockFields;
+		return $block_fields;
 	}
 
 	/**
 	 * Set the delay in seconds for the sequence.
 	 *
-	 * @param int                                  $delayInSeconds
-	 * @param array<string,string|int>             $settings
-	 * @param \FluentCrm\App\Models\FunnelSequence $sequence
-	 * @param int                                  $funnelSubscriberId
+	 * @param int                                  $delay_in_seconds The delay in seconds.
+	 * @param array<string,string|int>             $settings The settings array.
+	 * @param \FluentCrm\App\Models\FunnelSequence $sequence The funnel sequence.
+	 * @param int                                  $funnel_subscriber_id The funnel subscriber ID.
 	 *
 	 * @return int
 	 */
-	public function setDelayInSeconds( $delayInSeconds, $settings, $sequence, $funnelSubscriberId ) {
-		$delay  = Arr::get( $settings, 'wait_time_amount', null );
-		$min  = Arr::get( $settings, 'wait_time_amount_min', null );
-		$max  = Arr::get( $settings, 'wait_time_amount_max', 0 );
-		$unit = Arr::get( $settings, 'wait_time_unit' );
+	public function setDelayInSeconds( $delay_in_seconds, $settings, $sequence, $funnel_subscriber_id ) {
+		$delay = Arr::get( $settings, 'wait_time_amount', null );
+		$min   = Arr::get( $settings, 'wait_time_amount_min', null );
+		$max   = Arr::get( $settings, 'wait_time_amount_max', 0 );
+		$unit  = Arr::get( $settings, 'wait_time_unit' );
 
-		$waitTimes = $delay;
+		$wait_times = $delay;
 
-		if ( $min >= 0 & $max > 0 ) {
+		if ( $min >= 0 && $max > 0 ) {
 			if ( 'minutes' === $unit || 'seconds' === $unit ) {
 				// Crons run at minute intervals, so we need to stick with whole minutes.
-				$waitTimes = rand( $min, $max );
+				$wait_times = wp_rand( $min, $max );
 			} else {
 				// Everything else can be more granular.
-				$waitTimes = rand( $min * 100, $max * 100 ) / 100;
+				$wait_times = wp_rand( $min * 100, $max * 100 ) / 100;
 			}
 		}
 
-		if ( $unit === 'hours' ) {
-			$waitTimes = $waitTimes * 60 * 60;
-		} elseif ( $unit === 'minutes' ) {
-			$waitTimes = $waitTimes * 60;
-		} elseif ( $unit === 'days' ) {
-			$waitTimes = $waitTimes * 60 * 60 * 24;
-		} elseif ( $unit === 'weeks' ) {
-			$waitTimes = $waitTimes * 60 * 60 * 24 * 7;
-		} elseif ( $unit === 'months' ) {
-			$waitTimes = $waitTimes * 60 * 60 * 24 * (365 / 12);
+		if ( 'hours' === $unit ) {
+			$wait_times = $wait_times * 60 * 60;
+		} elseif ( 'minutes' === $unit ) {
+			$wait_times = $wait_times * 60;
+		} elseif ( 'days' === $unit ) {
+			$wait_times = $wait_times * 60 * 60 * 24;
+		} elseif ( 'weeks' === $unit ) {
+			$wait_times = $wait_times * 60 * 60 * 24 * 7;
+		} elseif ( 'months' === $unit ) {
+			$wait_times = $wait_times * 60 * 60 * 24 * ( 365 / 12 );
 		}
 
-		if ( $waitTimes !== $delayInSeconds ) {
+		if ( $wait_times !== $delay_in_seconds ) {
 			// Track the random time as an event for debugging.
-			\FluentCrmApi( 'event_tracker' )->track([
+			\FluentCrmApi( 'event_tracker' )->track( [
 				'event_key' => 'random_wait_time', // Required
 				'title'     => 'Randomized Wait Time', // Required
-				'value'     => json_encode([
-					'next_sequence' => date( 'Y-m-d H:i:s', current_time( 'timestamp' ) + $waitTimes ),
-					'delay'         => $waitTimes,
+				'value'     => wp_json_encode([
+					'next_sequence' => gmdate( 'Y-m-d H:i:s', time() + $wait_times ),
+					'delay'         => $wait_times,
 				]),
 				'email'     => 'daniel@code-atlantic.com',
 				'provider'  => 'debug', // If left empty, 'custom' will be added.
-			], false);
+			], false );
 		}
 
-		return $waitTimes;
+		return $wait_times;
 	}
 }

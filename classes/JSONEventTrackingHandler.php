@@ -58,7 +58,7 @@ class JSONEventTrackingHandler {
 	 *
 	 * @return array<int<0,max>,array<string,string>>
 	 */
-	public function getEventTrackingPropsOptions( $options = [] ) {
+	public function get_event_tracking_props_options( $options = [] ) {
 		$event_key = Arr::get( $options, 'event_key' );
 
 		$rows = EventTracker::select( [ 'value', 'event_key', 'title' ] )
@@ -66,7 +66,7 @@ class JSONEventTrackingHandler {
 			->orderBy( 'event_key', 'DESC' )
 			->get();
 
-		$formattedItems = [];
+		$formatted_items = [];
 
 		$unique_props = [];
 
@@ -83,23 +83,23 @@ class JSONEventTrackingHandler {
 				continue;
 			}
 
-			foreach ( $value as $propName => $propValue ) {
-				$key = $event_key . ':' . $propName;
+			foreach ( $value as $prop_name => $prop_value ) {
+				$key = $event_key . ':' . $prop_name;
 
 				if ( ! isset( $unique_props[ $key ] ) ) {
-					$type = gettype( $propValue );
+					$type = gettype( $prop_value );
 
-					if ( is_numeric( $propValue ) ) {
-						$type = is_int( $propValue ) ? 'int' : 'float';
+					if ( is_numeric( $prop_value ) ) {
+						$type = is_int( $prop_value ) ? 'int' : 'float';
 					}
-					if ( is_bool( $propValue ) ) {
+					if ( is_bool( $prop_value ) ) {
 						$type = 'bool';
 					}
-					if ( is_null( $propValue ) ) {
+					if ( is_null( $prop_value ) ) {
 						$type = 'null';
 					}
-					if ( is_string( $propValue ) ) {
-						$object_test = json_decode( $propValue );
+					if ( is_string( $prop_value ) ) {
+						$object_test = json_decode( $prop_value );
 						if ( is_object( $object_test ) ) {
 							$type = 'object';
 						}
@@ -108,7 +108,7 @@ class JSONEventTrackingHandler {
 					$unique_props[ $key ] = sprintf(
 						'%s: %s (%s)',
 						$title,
-						$propName,
+						$prop_name,
 						$type
 					);
 				}
@@ -116,13 +116,13 @@ class JSONEventTrackingHandler {
 		}
 
 		foreach ( $unique_props as $key => $value ) {
-			$formattedItems[] = [
+			$formatted_items[] = [
 				'id'    => $key,
 				'title' => $value,
 			];
 		}
 
-		return $formattedItems;
+		return $formatted_items;
 	}
 
 	/**
@@ -134,18 +134,18 @@ class JSONEventTrackingHandler {
 	 *
 	 * @return bool
 	 */
-	public static function assessEventObjectTrackingConditions( $passes, $conditions, $subscriber ) {
+	public static function assess_event_object_tracking_conditions( $passes, $conditions, $subscriber ) {
 		if ( ! Helper::isExperimentalEnabled( 'event_tracking' ) ) {
 			return false;
 		}
 
-		$hasSubscriber = Subscriber::where( 'id', $subscriber->id )->where(
+		$has_subscriber = Subscriber::where( 'id', $subscriber->id )->where(
 			function ( $q ) use ( $conditions ) {
 				do_action_ref_array( 'fluentcrm_contacts_filter_event_tracking_objects', [ &$q, $conditions ] );
 			}
 		)->first();
 
-		return (bool) $hasSubscriber;
+		return (bool) $has_subscriber;
 	}
 
 	/**
@@ -156,7 +156,7 @@ class JSONEventTrackingHandler {
 	 *
 	 * @return \ContactsQuery
 	 */
-	public function applyEventTrackingFilter( $query, $filters ) {
+	public static function apply_event_tracking_filter( $query, $filters ) {
 		global $wpdb;
 
 		if ( ! Helper::isExperimentalEnabled( 'event_tracking' ) ) {
@@ -170,24 +170,23 @@ class JSONEventTrackingHandler {
 
 			$relation = 'trackingEvents';
 
-			$filterProp = $filter['property'];
+			$filter_prop = $filter['property'];
 
-			if ( 'event_tracking_json_prop' === $filterProp || 'event_tracking_object_prop' === $filterProp ) {
-				$eventPropKey = Arr::get( $filter, 'extra_value' );
+			if ( 'event_tracking_json_prop' === $filter_prop || 'event_tracking_object_prop' === $filter_prop ) {
+				$event_prop_key = Arr::get( $filter, 'extra_value' );
 
-				$key = explode( ':', $eventPropKey );
+				$key = explode( ':', $event_prop_key );
 
-				$eventKey = $key[0];
-				$propName = $key[1];
-				$propType = isset( $key[2] ) ? $key[2] : 'string';
+				$event_key_var = $key[0];
+				$prop_name     = $key[1];
+				$prop_type     = isset( $key[2] ) ? $key[2] : 'string';
 
-				if ( ! $eventKey ) {
+				if ( ! $event_key_var ) {
 					continue;
 				}
 
-				switch ( $propType ) {
+				switch ( $prop_type ) {
 					case 'int':
-						// $query->whereRaw('value', [200])
 				}
 
 				$operator = $filter['operator'];
@@ -195,10 +194,10 @@ class JSONEventTrackingHandler {
 				if ( doing_action( 'fluent_crm/event_tracked' ) ) {
 					// We only care about the latest event.
 					$subquery = "(
-						SELECT JSON_EXTRACT(`value`, '$.{$propName}')
+						SELECT JSON_EXTRACT(`value`, '$.{$prop_name}')
 						FROM `{$wpdb->prefix}fc_event_tracking`
 						WHERE `subscriber_id` = `{$wpdb->prefix}fc_subscribers`.`id`
-							AND `event_key` = '{$eventKey}'
+							AND `event_key` = '{$event_key_var}'
 						ORDER BY `created_at` DESC
 						LIMIT 1
 					)";
@@ -210,83 +209,83 @@ class JSONEventTrackingHandler {
 					} elseif ( in_array( $operator, [ '<', '>' ], true ) ) {
 						$query->whereRaw( "{$subquery} {$operator} ?", [ (float) $filter['value'] ] );
 					} elseif ( 'contains' === $operator ) {
-						$escapedValue = $wpdb->esc_like( $filter['value'] );
-						$query->whereRaw( "{$subquery} LIKE ?", [ '%' . $escapedValue . '%' ] );
+						$escaped_value = $wpdb->esc_like( $filter['value'] );
+						$query->whereRaw( "{$subquery} LIKE ?", [ '%' . $escaped_value . '%' ] );
 					} elseif ( 'not_contains' === $operator ) {
-						$escapedValue = $wpdb->esc_like( $filter['value'] );
-						$query->whereRaw( "{$subquery} NOT LIKE ?", [ '%' . $escapedValue . '%' ] );
+						$escaped_value = $wpdb->esc_like( $filter['value'] );
+						$query->whereRaw( "{$subquery} NOT LIKE ?", [ '%' . $escaped_value . '%' ] );
 					}
 				} elseif ( '=' === $operator ) {
 						$query->whereHas(
 							$relation, function ( $q ) use (
 								$filter,
-								$eventKey,
-								$propName,
+								$event_key_var,
+								$prop_name,
 							) {
 								$q
 									->where(
 										'event_key',
-										$eventKey
+										$event_key_var
 									)
-									->whereRaw( "JSON_EXTRACT(`value`, '$.{$propName}') = ?", [ (float) $filter['value'] ] );
+									->whereRaw( "JSON_EXTRACT(`value`, '$.{$prop_name}') = ?", [ (float) $filter['value'] ] );
 							}
 						);
 				} elseif ( '!=' === $operator ) {
 					$query->whereDoesntHave(
 						$relation, function ( $q ) use (
 							$filter,
-							$eventKey,
-							$propName,
+							$event_key_var,
+							$prop_name,
 						) {
 							$q
 								->where(
 									'event_key',
-									$eventKey
+									$event_key_var
 								)
-								->whereRaw( "JSON_EXTRACT(`value`, '$.{$propName}') = ?", [ (float) $filter['value'] ] );
+								->whereRaw( "JSON_EXTRACT(`value`, '$.{$prop_name}') = ?", [ (float) $filter['value'] ] );
 						}
 					);
 				} elseif ( in_array( $operator, [ '<', '>' ], true ) ) {
 					$query->whereHas(
 						$relation, function ( $q ) use (
 							$filter,
-							$eventKey,
-							$propName,
+							$event_key_var,
+							$prop_name,
 							$operator,
 						) {
 							$q
-								->where( 'event_key', $eventKey )
-								->whereRaw( "JSON_EXTRACT(`value`, '$.{$propName}') {$operator} ?", [ (float) $filter['value'] ] );
+								->where( 'event_key', $event_key_var )
+								->whereRaw( "JSON_EXTRACT(`value`, '$.{$prop_name}') {$operator} ?", [ (float) $filter['value'] ] );
 						}
 					);
 				} elseif ( 'contains' === $operator ) {
 					$query->whereHas(
 						$relation, function ( $q ) use (
 							$filter,
-							$eventKey,
-							$propName,
+							$event_key_var,
+							$prop_name,
 							$wpdb,
 						) {
-							$escapedValue = $wpdb->esc_like( $filter['value'] );
+							$escaped_value = $wpdb->esc_like( $filter['value'] );
 
 							$q
-								->where( 'event_key', $eventKey )
-								->whereRaw( "JSON_EXTRACT(`value`, '$.{$propName}') LIKE '%{$escapedValue}%'" );
+								->where( 'event_key', $event_key_var )
+								->whereRaw( "JSON_EXTRACT(`value`, '$.{$prop_name}') LIKE '%{$escaped_value}%'" );
 						}
 					);
 				} elseif ( 'not_contains' === $operator ) {
 						$query->whereDoesntHave(
 							$relation, function ( $q ) use (
 								$filter,
-								$eventKey,
-								$propName,
+								$event_key_var,
+								$prop_name,
 								$wpdb,
 							) {
-								$escapedValue = $wpdb->esc_like( $filter['value'] );
+								$escaped_value = $wpdb->esc_like( $filter['value'] );
 
 								$q
-									->where( 'event_key', $eventKey )
-									->whereRaw( "JSON_EXTRACT(`value`, '$.{$propName}') LIKE '%{$escapedValue}%'" );
+									->where( 'event_key', $event_key_var )
+									->whereRaw( "JSON_EXTRACT(`value`, '$.{$prop_name}') LIKE '%{$escaped_value}%'" );
 							}
 						);
 						break;
@@ -305,7 +304,7 @@ class JSONEventTrackingHandler {
 	 *
 	 * @return array<string,mixed>
 	 */
-	public function addSubscriberInfoWidgets( $widgets, $subscriber ) {
+	public function add_subscriber_info_widgets( $widgets, $subscriber ) {
 		if ( ! Helper::isExperimentalEnabled( 'event_tracking' ) ) {
 			return $widgets;
 		}
@@ -343,7 +342,7 @@ class JSONEventTrackingHandler {
 		$html .= '</ul></div>';
 
 		$widgets['event_tracking_json'] = [
-			'title'          => __( 'Event Tracking (JSON)', 'fluent-crm' ),
+			'title'          => __( 'Event Tracking (JSON)', 'fluent-crm-custom-features' ),
 			'content'        => $html,
 			'has_pagination' => $events->total() > $events->perPage(),
 			'total'          => $events->total(),
@@ -361,14 +360,14 @@ class JSONEventTrackingHandler {
 	 *
 	 * @return array<string,mixed>
 	 */
-	public function addEventTrackingFilterOptions( $groups ) {
+	public function add_event_tracking_filter_options( $groups ) {
 		if ( ! Helper::isExperimentalEnabled( 'event_tracking' ) ) {
 			return $groups;
 		}
 
 		foreach ( $groups as $key => $group ) {
 			if ( 'event_tracking' === $key ) {
-				$groups[ $key ]['children'] = array_merge( $group['children'], $this->getConditionItems() );
+				$groups[ $key ]['children'] = array_merge( $group['children'], $this->get_condition_items() );
 				break;
 			}
 		}
@@ -382,14 +381,14 @@ class JSONEventTrackingHandler {
 	 * @param array<int<0,max>,array<string,mixed>> $items The condition items.
 	 * @return array<int<0,max>,array<string,mixed>>
 	 */
-	public function addEventTrackingConditionOptions( $items ) {
+	public function add_event_tracking_condition_options( $items ) {
 		if ( ! Helper::isExperimentalEnabled( 'event_tracking' ) ) {
 			return $items;
 		}
 
 		foreach ( $items as $key => $item ) {
 			if ( 'event_tracking' === $item['value'] ) {
-				$items[ $key ]['children'] = array_merge( $item['children'], $this->getConditionItems() );
+				$items[ $key ]['children'] = array_merge( $item['children'], $this->get_condition_items() );
 				break;
 			}
 		}
@@ -402,10 +401,10 @@ class JSONEventTrackingHandler {
 	 *
 	 * @return array<int<0,max>,array<string,mixed>>
 	 */
-	private function getConditionItems() {
+	private function get_condition_items() {
 		return [
 			[
-				'label'            => __( 'Event JSON Prop', 'fluent-crm' ),
+				'label'            => __( 'Event JSON Prop', 'fluent-crm-custom-features' ),
 				'value'            => 'event_tracking_json_prop',
 				'type'             => 'composite_optioned_compare',
 				'help'             => 'The compare value will be matched with selected event & last recorded value of the selected event prop',

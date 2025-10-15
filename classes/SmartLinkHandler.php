@@ -28,9 +28,9 @@ class SmartLinkHandler extends \FluentCampaign\App\Hooks\Handlers\SmartLinkHandl
 	 * @return void
 	 */
 	public function handleClick( $slug, $contact = null ) {
-		$smartLink = SmartLink::where( 'short', $slug )->first();
+		$smart_link = SmartLink::where( 'short', $slug )->first();
 
-		if ( ! $smartLink ) {
+		if ( ! $smart_link ) {
 			return;
 		}
 
@@ -40,20 +40,20 @@ class SmartLinkHandler extends \FluentCampaign\App\Hooks\Handlers\SmartLinkHandl
 
 		// Increment click count.
 		if ( $contact ) {
-			// Here to preserve original order. If this $smartLink->save();
+			// Here to preserve original order. If this $smart_link->save();
 			// doesn't need to be done before tags/lists, then this can be merged,
 			// and the save() can be done at the end.
-			++$smartLink->contact_clicks;
+			++$smart_link->contact_clicks;
 		}
 
-		++$smartLink->all_clicks;
-		$smartLink->save();
+		++$smart_link->all_clicks;
+		$smart_link->save();
 
 		if ( $contact ) {
-			$tags        = Arr::get( $smartLink->actions, 'tags' );
-			$lists       = Arr::get( $smartLink->actions, 'lists' );
-			$removeTags  = Arr::get( $smartLink->actions, 'remove_tags' );
-			$removeLists = Arr::get( $smartLink->actions, 'remove_lists' );
+			$tags         = Arr::get( $smart_link->actions, 'tags' );
+			$lists        = Arr::get( $smart_link->actions, 'lists' );
+			$remove_tags  = Arr::get( $smart_link->actions, 'remove_tags' );
+			$remove_lists = Arr::get( $smart_link->actions, 'remove_lists' );
 
 			// Perform actions based on smart link settings.
 			if ( $tags ) {
@@ -62,54 +62,55 @@ class SmartLinkHandler extends \FluentCampaign\App\Hooks\Handlers\SmartLinkHandl
 			if ( $lists ) {
 				$contact->attachLists( $lists );
 			}
-			if ( $removeTags ) {
-				$contact->detachTags( $removeTags );
+			if ( $remove_tags ) {
+				$contact->detachTags( $remove_tags );
 			}
-			if ( $removeLists ) {
-				$contact->detachLists( $removeLists );
+			if ( $remove_lists ) {
+				$contact->detachLists( $remove_lists );
 			}
 
-			if ( 'yes' === Arr::get( $smartLink->actions, 'auto_login' ) ) {
+			if ( 'yes' === Arr::get( $smart_link->actions, 'auto_login' ) ) {
 				$this->makeAutoLogin( $contact );
 			}
 		}
 
-		$targetUrl = $this->getTargetUrl( $smartLink, $contact );
+		$target_url = $this->getTargetUrl( $smart_link, $contact );
 
-		do_action( 'fluent_crm/smart_link_clicked_by_contact', $smartLink, $contact );
+		do_action( 'fluent_crm/smart_link_clicked_by_contact', $smart_link, $contact );
 		nocache_headers();
-		wp_safe_redirect( $targetUrl, 307 );
+		wp_safe_redirect( $target_url, 307 );
 		exit();
 	}
 
 	/**
 	 * Get the target URL for the smart link with query parameters preserved.
 	 *
-	 * @param SmartLink                     $smartLink The smart link object.
+	 * @param SmartLink                     $smart_link The smart link object.
 	 * @param \FluentCrm\App\Models\Contact $contact The contact object.
 	 *
 	 * @return string The target URL with query parameters preserved.
 	 */
-	public function getTargetUrl( $smartLink, $contact ) {
+	public function getTargetUrl( $smart_link, $contact ) {
 		$ignored_params = [ 'fluentcrm', 'route', 'slug' ]; // Define the parameters to ignore.
-		$queryParams    = array_diff_key( $_GET, array_flip( $ignored_params ) ); // Filter out ignored parameters.
-		$queryString    = http_build_query( $queryParams ); // Build the query string from remaining parameters.
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Reading query params for smart link redirect, nonce not applicable.
+		$query_params = array_diff_key( $_GET, array_flip( $ignored_params ) ); // Filter out ignored parameters.
+		$query_string = http_build_query( $query_params ); // Build the query string from remaining parameters.
 
-		$targetUrl = $smartLink->target_url;
+		$target_url = $smart_link->target_url;
 
 		// Apply dynamic content if needed and redirect.
-		if ( strpos( $targetUrl, '{{' ) ) {
-			$targetUrl = apply_filters( 'fluent_crm/parse_campaign_email_text', $targetUrl, $contact );
-			$targetUrl = esc_url_raw( $targetUrl );
+		if ( strpos( $target_url, '{{' ) ) {
+			$target_url = apply_filters( 'fluent_crm/parse_campaign_email_text', $target_url, $contact );
+			$target_url = esc_url_raw( $target_url );
 		}
 
-		if ( strpos( $targetUrl, '?' ) === false ) {
-			$targetUrl .= '?';
+		if ( false === strpos( $target_url, '?' ) ) {
+			$target_url .= '?';
 		} else {
-			$targetUrl .= '&';
+			$target_url .= '&';
 		}
 
-		return $targetUrl . $queryString;
+		return $target_url . $query_string;
 	}
 
 	/**
@@ -130,8 +131,8 @@ class SmartLinkHandler extends \FluentCampaign\App\Hooks\Handlers\SmartLinkHandl
 			return false;
 		}
 
-		$willAllowLogin = apply_filters( 'fluent_crm/will_make_auto_login', did_action( 'fluent_crm/smart_link_verified' ), $contact );
-		if ( ! $willAllowLogin ) {
+		$will_allow_login = apply_filters( 'fluent_crm/will_make_auto_login', did_action( 'fluent_crm/smart_link_verified' ), $contact );
+		if ( ! $will_allow_login ) {
 			return false;
 		}
 
@@ -139,16 +140,17 @@ class SmartLinkHandler extends \FluentCampaign\App\Hooks\Handlers\SmartLinkHandl
 			return false;
 		}
 
-		$currentContact = fluentcrm_get_current_contact();
+		$current_contact = fluentcrm_get_current_contact();
 
-		if ( ! $currentContact || $currentContact->id != $contact->id ) {
+		if ( ! $current_contact || $current_contact->id !== $contact->id ) {
 			return false;
 		}
 
-		add_filter( 'authenticate', [ $this, 'allowProgrammaticLogin' ], 10, 3 );    // hook in earlier than other callbacks to short-circuit them
-		$user = wp_signon([
-			'user_login'    => $user->user_login,
-			'user_password' => '',
+		add_filter( 'authenticate', [ $this, 'allowProgrammaticLogin' ], 10, 3 );    // Hook in earlier than other callbacks to short-circuit them.
+		$user = wp_signon(
+			[
+				'user_login'    => $user->user_login,
+				'user_password' => '',
 			]
 		);
 		remove_filter( 'authenticate', [ $this, 'allowProgrammaticLogin' ], 10, 3 );

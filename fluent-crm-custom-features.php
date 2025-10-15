@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Plugin Name: FluentCRM - Custom events, actions and conditionals.
  * Plugin URI: https://github.com/danieliser/fluent-crm-json-events
@@ -18,8 +17,6 @@
  * @copyright  Copyright (c) 2024, Code Atlantic LLC.
  */
 
-use function Crontrol\get_hook_callbacks;
-
 // Register autoloader.
 require_once __DIR__ . '/vendor/autoload.php';
 
@@ -27,7 +24,10 @@ add_action(
 	'init',
 	function () {
 		( new \CustomCRM\JSONEventTrackingHandler() )->register();
-		( new \CustomCRM\EDDSubscriptionRules() )->register();
+
+		$edd_rules = new \CustomCRM\EDDSubscriptionRules();
+		$edd_rules->register();
+
 		( new \CustomCRM\Actions\RandomWaitTimeAction() )->register();
 
 		// Remove the default update contact property action (broken).
@@ -42,10 +42,10 @@ add_action(
 		remove_all_actions( 'fluentcrm_smartlink_clicked' );
 		remove_all_actions( 'fluentcrm_smartlink_clicked_direct' );
 		// Register our custom smart link handler.
-		$fixSmartLinkRedirects = new \CustomCRM\SmartLinkHandler();
+		$fix_smart_link_redirects = new \CustomCRM\SmartLinkHandler();
 
-		add_action( 'fluentcrm_smartlink_clicked', [ $fixSmartLinkRedirects, 'handleClick' ], 9, 1 );
-		add_action( 'fluentcrm_smartlink_clicked_direct', [ $fixSmartLinkRedirects, 'handleClick' ], 9, 2 );
+		add_action( 'fluentcrm_smartlink_clicked', [ $fix_smart_link_redirects, 'handleClick' ], 9, 1 );
+		add_action( 'fluentcrm_smartlink_clicked_direct', [ $fix_smart_link_redirects, 'handleClick' ], 9, 2 );
 	},
 	99
 );
@@ -53,13 +53,20 @@ add_action(
 // Hook to add custom dashboard metrics
 // add_action( 'fluent_crm/dashboard_stats', 'add_custom_dashboard_metrics' );
 
+/**
+ * Add custom dashboard metrics.
+ *
+ * @param array<string,mixed> $data The dashboard data.
+ *
+ * @return array<string,mixed>
+ */
 function add_custom_dashboard_metrics( $data ) {
 	// Example: Adding a new metric for total subscribers.
-	$totalSubscribers = \FluentCrm\App\Models\Subscriber::count();
+	$total_subscribers = \FluentCrm\App\Models\Subscriber::count();
 
 	$data['total_subscribers_metric'] = [
-		'title' => __( 'Total Subscribers', 'fluent-crm' ),
-		'count' => $totalSubscribers,
+		'title' => __( 'Total Subscribers', 'fluent-crm-custom-features' ),
+		'count' => $total_subscribers,
 		'route' => [
 			'name' => 'subscribers',
 		],
@@ -72,20 +79,32 @@ function add_custom_dashboard_metrics( $data ) {
 // Hook to register a custom report
 add_action( 'fluent_crm/reporting/reports', 'register_custom_report' );
 
+/**
+ * Register a custom report.
+ *
+ * @param array<string,mixed> $reports The reports array.
+ *
+ * @return array<string,mixed>
+ */
 function register_custom_report( $reports ) {
 	$reports['custom_report'] = [
-		'title'    => __( 'Custom Report', 'fluent-crm' ),
+		'title'    => __( 'Custom Report', 'fluent-crm-custom-features' ),
 		'callback' => 'render_custom_report',
 	];
 
 	return $reports;
 }
 
+/**
+ * Render the custom report.
+ *
+ * @return void
+ */
 function render_custom_report() {
 	// Logic to render your custom report
 	$subscribers = \FluentCrm\App\Models\Subscriber::all();
 	// Output your report data here
-	echo '<h2>' . __( 'Custom Report', 'fluent-crm' ) . '</h2>';
+	echo '<h2>' . esc_html__( 'Custom Report', 'fluent-crm-custom-features' ) . '</h2>';
 	echo '<ul>';
 	foreach ( $subscribers as $subscriber ) {
 		echo '<li>' . esc_html( $subscriber->email ) . '</li>';
@@ -105,7 +124,7 @@ add_action('rest_api_init', function () {
 /**
  * Get List Growth metrics
  *
- * @param WP_REST_Request $request
+ * @param WP_REST_Request $request The REST request object.
  * @return WP_REST_Response
  */
 function get_list_growth( WP_REST_Request $request ) {
@@ -113,28 +132,28 @@ function get_list_growth( WP_REST_Request $request ) {
 	$to   = $request->get_param( 'to' );
 
 	// Convert dates to Carbon instances
-	$fromDate = \Carbon\Carbon::parse( $from );
-	$toDate   = \Carbon\Carbon::parse( $to );
+	$from_date = \Carbon\Carbon::parse( $from );
+	$to_date   = \Carbon\Carbon::parse( $to );
 
 	// Count new subscribers
-	$newSubscribers = fluentCrmDb()->table( 'fc_subscribers' )
-		->whereBetween( 'created_at', [ $fromDate->format( 'Y-m-d' ), $toDate->format( 'Y-m-d' ) ] )
+	$new_subscribers = fluentCrmDb()->table( 'fc_subscribers' )
+		->whereBetween( 'created_at', [ $from_date->format( 'Y-m-d' ), $to_date->format( 'Y-m-d' ) ] )
 		->where( 'status', 'subscribed' )
 		->count();
 
 	// Count unsubscribed
 	$unsubscribed = fluentCrmDb()->table( 'fc_subscriber_meta' )
-		->whereBetween( 'created_at', [ $fromDate->format( 'Y-m-d' ), $toDate->format( 'Y-m-d' ) ] )
+		->whereBetween( 'created_at', [ $from_date->format( 'Y-m-d' ), $to_date->format( 'Y-m-d' ) ] )
 		->where( 'key', 'unsubscribe_reason' )
 		->count();
 
 	// Calculate net growth
-	$netGrowth = $newSubscribers - $unsubscribed;
+	$net_growth = $new_subscribers - $unsubscribed;
 
 	return new WP_REST_Response([
-		'new_subscribers' => $newSubscribers,
+		'new_subscribers' => $new_subscribers,
 		'unsubscribed'    => $unsubscribed,
-		'net_growth'      => $netGrowth,
+		'net_growth'      => $net_growth,
 	], 200);
 }
 
@@ -145,13 +164,16 @@ add_filter( 'fluent_crm/dashboard_data', 'add_custom_dashboard_metrics_for_list_
 /**
  * Add custom dashboard metrics for list growth.
  *
- * @param array $data Existing dashboard data.
- * @return array Modified dashboard data with list growth metrics.
+ * @param array<string,mixed> $data The dashboard data.
+ *
+ * @return array<string,mixed>
  */
 function add_custom_dashboard_metrics_for_list_growth( $data ) {
 	// Get the date range from the request or set default values.
+	// phpcs:disable WordPress.Security.NonceVerification.Recommended
 	$from = isset( $_GET['from'] ) ? sanitize_text_field( wp_unslash( $_GET['from'] ) ) : gmdate( 'Y-m-01' );
 	$to   = isset( $_GET['to'] ) ? sanitize_text_field( wp_unslash( $_GET['to'] ) ) : gmdate( 'Y-m-t' );
+	// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
 	// Calculate new subscribers and unsubscribes.
 	$new_subscribers = fluentCrmDb()->table( 'fc_subscribers' )
@@ -169,7 +191,7 @@ function add_custom_dashboard_metrics_for_list_growth( $data ) {
 
 	// Add the new metrics to the dashboard data.
 	$data['list_growth'] = [
-		'title'           => __( 'List Growth', 'bricks-child' ),
+		'title'           => __( 'List Growth', 'fluent-crm-custom-features' ),
 		'new_subscribers' => $new_subscribers,
 		'unsubscribed'    => $unsubscribed,
 		'net_growth'      => $net_growth,

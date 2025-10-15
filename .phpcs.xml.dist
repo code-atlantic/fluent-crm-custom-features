@@ -1,0 +1,54 @@
+<?xml version="1.0"?>
+<ruleset name="WordPress Coding Standards for Plugin">
+	<description>Sniffs for WordPress plugins</description>
+
+	<file>.</file>
+	<!-- Exclude these -->
+	<exclude-pattern type="relative">bin/*</exclude-pattern>
+	<exclude-pattern type="relative">build/*</exclude-pattern>
+	<exclude-pattern type="relative">dist/*</exclude-pattern>
+	<exclude-pattern type="relative">vendor/*</exclude-pattern>
+	<exclude-pattern type="relative">vendor-prefixed/*</exclude-pattern>
+	<exclude-pattern type="relative">tests/*</exclude-pattern>
+
+	<arg name="extensions" value="php" />
+	<!-- Show progress and sniff codes in all reports -->
+	<arg value="ps" />
+
+	<!--
+	https://github.com/PHPCompatibility/PHPCompatibility#sniffing-your-code-for-compatibility-with-specific-php-versions -->
+	<config name="testVersion" value="7.4-" />
+	<!--
+	https://github.com/WordPress-Coding-Standards/WordPress-Coding-Standards/wiki/Customizable-sniff-properties -->
+	<config name="minimum_supported_wp_version" value="5.8" />
+	<config name="text_domain" value="fluent-crm-custom-features, default" />
+
+	<!-- Force short syntax arrays. -->
+	<rule ref="CodeAtlantic">
+		<rule ref="Universal.Arrays.DisallowLongArraySyntax" />
+		<exclude name="Universal.Arrays.DisallowShortArraySyntax" />
+
+		<!-- Allow PSR file name & class names. -->
+		<exclude name="WordPress.Files.FileName.NotHyphenatedLowercase" />
+		<exclude name="WordPress.Files.FileName.InvalidClassFileName" />
+		<exclude name="WordPress.NamingConventions.ValidFunctionName.MethodNameInvalid" />
+
+		<!-- Custom code doesn't need to follow this rule -->
+		<exclude name="Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed" />
+		<exclude name="Squiz.Commenting.InlineComment.InvalidEndChar" />
+
+		<!-- Allow mixing class and helper function in main plugin file (WordPress pattern) -->
+		<exclude name="Universal.Files.SeparateFunctionsFromOO.Mixed" />
+
+		<!-- EDD/FluentCRM integrations require direct database queries -->
+		<exclude name="WordPress.DB.DirectDatabaseQuery.DirectQuery" />
+		<exclude name="WordPress.DB.DirectDatabaseQuery.NoCaching" />
+		
+
+		<!-- Allow commented code -->
+		<exclude name="Squiz.PHP.CommentedOutCode" />
+		<exclude name="Squiz.Commenting.BlockComment.NoEmptyLineBefore" />
+		<exclude name="Squiz.Commenting.BlockComment.NoCapital" />
+	</rule>
+
+</ruleset>

@@ -1,0 +1,84 @@
+{
+	"name": "wppopupmaker/fluent-crm-custom-features",
+	"description": "Custom FluentCRM features and integrations for EDD subscriptions and enhanced automation.",
+	"type": "wordpress-plugin",
+	"author": "Code Atlantic LLC",
+	"license": "GPL-2.0-or-later",
+	"homepage": "https://wppopupmaker.com/",
+	"support": {
+		"issues": "https://wppopupmaker.com/support"
+	},
+	"prefer-stable": true,
+	"minimum-stability": "dev",
+	"require": {
+		"php": ">=7.4"
+	},
+	"require-dev": {
+		"php": ">=7.4 || ^8.0",
+		"code-atlantic/coding-standards": "1.1.0",
+		"dealerdirect/phpcodesniffer-composer-installer": "1.1.2",
+		"phpcompatibility/phpcompatibility-wp": "^2.1.7",
+		"phpstan/phpstan": "^2.1.31",
+		"szepeviktor/phpstan-wordpress": "^2.0",
+		"phpstan/extension-installer": "^1.4"
+	},
+	"autoload": {
+		"psr-4": {
+			"CustomCRM\\": "classes/"
+		},
+		"classmap": [
+			"vendor-prefixed"
+		]
+	},
+	"scripts": {
+		"format": "vendor/bin/phpcbf --standard=.phpcs.xml.dist --report-summary --report-source",
+		"lint": "vendor/bin/phpcs --standard=.phpcs.xml.dist",
+		"lint:report": "vendor/bin/phpcs --standard=.phpcs.xml.dist --report-full --report-checkstyle=./phpcs-report.xml",
+		"install-strauss": [
+			"test -f strauss.phar || curl -o strauss.phar -L -C - https://github.com/BrianHenryIE/strauss/releases/download/0.22.4/strauss.phar"
+		],
+		"clean-vendor-prefix-folder": [
+			"rm -rf vendor-prefixed/**/*"
+		],
+		"post-install-cmd": [
+			"@clean-vendor-prefix-folder",
+			"@strauss",
+			"composer dump-autoload"
+		],
+		"post-update-cmd": [
+			"@clean-vendor-prefix-folder",
+			"@strauss",
+			"composer dump-autoload"
+		],
+		"phpstan": "vendor/bin/phpstan analyse --memory-limit=1024M",
+		"phpstan:baseline": "vendor/bin/phpstan analyse --memory-limit=1024M --generate-baseline",
+		"strauss": [
+			"@install-strauss",
+			"@php strauss.phar"
+		],
+		"test": [
+			"@lint",
+			"@phpstan"
+		]
+	},
+	"extra": {
+		"strauss": {
+			"target_directory": "/vendor-prefixed/",
+			"namespace_prefix": "CustomCRM\\Vendor\\",
+			"classmap_prefix": "CustomCRM_",
+			"constant_prefix": "CUSTOM_CRM_",
+			"packages": [],
+			"exclude_from_copy": {
+				"packages": []
+			}
+		}
+	},
+	"config": {
+		"platform-check": false,
+		"allow-plugins": {
+			"dealerdirect/phpcodesniffer-composer-installer": true,
+			"phpstan/extension-installer": true
+		},
+		"optimize-autoloader": true
+	}
+}
