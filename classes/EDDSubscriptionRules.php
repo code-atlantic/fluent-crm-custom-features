@@ -30,31 +30,35 @@ class EDDSubscriptionRules {
 	 * @return void
 	 */
 	public function register() {
-		// Add custom rule types.
-		// add_filter( 'fluentcrm_advanced_filter_options', [ $this, 'addEddFilterOptions' ], 11, 1 );
-		// add_filter( 'fluentcrm_contacts_filter_edd', [ $this, 'applyEddFilters' ], 10, 2 );
+		// Add custom filter group (not added to existing 'edd' group).
+		add_filter( 'fluentcrm_advanced_filter_options', [ $this, 'addCustomFilterGroup' ], 11, 1 );
+		add_filter( 'fluentcrm_contacts_filter_edd_subscriptions', [ $this, 'applySubscriptionFilters' ], 10, 2 );
 
-		// add_filter( 'fluent_crm/event_tracking_condition_groups', [ $this, 'addEddFilterOptions' ], 11, 1 );
+		// Add custom rule types for automation event tracking conditions.
+		add_filter( 'fluent_crm/event_tracking_condition_groups', [ $this, 'addCustomFilterGroup' ], 11, 1 );
 
-		// Apply conditional subscription rules.
-		// add_filter( 'fluentcrm_automation_conditions_assess_edd', [ $this, 'assess_subscription_condition' ], 10, 3 );
+		// Apply conditional subscription rules in automations.
+		add_filter( 'fluentcrm_automation_conditions_assess_edd_subscriptions', [ $this, 'assess_subscription_condition' ], 10, 3 );
 	}
 
 
 	/**
-	 * Add event tracking filter options.
+	 * Add custom filter group for EDD subscriptions.
+	 *
+	 * Creates a separate filter group instead of adding to existing 'edd' group
+	 * to avoid FluentCRM's built-in EDD relationship table constraints.
 	 *
 	 * @param array<string,mixed> $groups Groups.
 	 *
 	 * @return array<string,mixed>
 	 */
-	public function addEddFilterOptions( $groups ) {
-		foreach ( $groups as $key => $group ) {
-			if ( 'edd' === $key ) {
-				$groups[ $key ]['children'] = array_merge( $group['children'], $this->getConditionItems() );
-				break;
-			}
-		}
+	public function addCustomFilterGroup( $groups ) {
+		// Add our own custom group for subscription filtering.
+		$groups['edd_subscriptions'] = [
+			'label'    => __( 'EDD Subscriptions', 'fluent-crm-custom-features' ),
+			'value'    => 'edd_subscriptions',
+			'children' => $this->getConditionItems(),
+		];
 
 		return $groups;
 	}
@@ -85,11 +89,14 @@ class EDDSubscriptionRules {
 	/**
 	 * Apply subscription filter to the query.
 	 *
+	 * This is called via 'fluentcrm_contacts_filter_edd_subscriptions' filter
+	 * when our custom filter group is used.
+	 *
 	 * @param \FluentCrm\Framework\Database\Query\Builder $query Query builder instance.
 	 * @param array                                       $filters Array of filter conditions.
 	 * @return \FluentCrm\Framework\Database\Query\Builder Modified query builder instance.
 	 */
-	public function applyEddFilters( $query, $filters ) {
+	public function applySubscriptionFilters( $query, $filters ) {
 		global $wpdb;
 
 		foreach ( $filters as $filter ) {
@@ -115,13 +122,14 @@ class EDDSubscriptionRules {
 					$placeholders = implode( ',', array_fill( 0, count( $product_ids ), '%d' ) );
 
 					if ( 'in' === $operator ) {
+						// Has active subscription - query directly against EDD tables.
 						$query->whereRaw(
 							$wpdb->prepare(
 								"EXISTS (
-									SELECT 1 
+									SELECT 1
 									FROM {$wpdb->prefix}edd_subscriptions AS sub
 									JOIN {$wpdb->prefix}edd_customers AS cust ON cust.id = sub.customer_id
-									WHERE cust.id = wp_fc_contact_relations.provider_id
+									WHERE (cust.user_id = {$wpdb->prefix}fc_subscribers.user_id OR cust.email = {$wpdb->prefix}fc_subscribers.email)
 									AND sub.product_id IN ($placeholders)
 									AND sub.status = %s
 								)",
@@ -129,24 +137,19 @@ class EDDSubscriptionRules {
 							)
 						);
 					} else {
-						$query->whereHas(
-							'contact_commerce',
-							function ( $q ) use ( $wpdb, $product_ids, $placeholders ) {
-								$q->where( 'provider', 'edd' )
-									->whereRaw(
-										$wpdb->prepare(
-											"NOT EXISTS (
-												SELECT 1 
-												FROM {$wpdb->prefix}edd_subscriptions AS sub
-												JOIN {$wpdb->prefix}edd_customers AS cust ON cust.id = sub.customer_id
-												WHERE cust.id = wp_fc_contact_relations.provider_id
-												AND sub.product_id IN ($placeholders)
-												AND sub.status = %s
-											)",
-											array_merge( $product_ids, [ 'active' ] )
-										)
-									);
-							}
+						// Does not have active subscription.
+						$query->whereRaw(
+							$wpdb->prepare(
+								"NOT EXISTS (
+									SELECT 1
+									FROM {$wpdb->prefix}edd_subscriptions AS sub
+									JOIN {$wpdb->prefix}edd_customers AS cust ON cust.id = sub.customer_id
+									WHERE (cust.user_id = {$wpdb->prefix}fc_subscribers.user_id OR cust.email = {$wpdb->prefix}fc_subscribers.email)
+									AND sub.product_id IN ($placeholders)
+									AND sub.status = %s
+								)",
+								array_merge( $product_ids, [ 'active' ] )
+							)
 						);
 					}
 					break;
