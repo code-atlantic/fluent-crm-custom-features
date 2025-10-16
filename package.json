@@ -1,0 +1,27 @@
+{
+	"name": "fluent-crm-custom-features",
+	"version": "1.0.0",
+	"description": "Custom FluentCRM features and integrations for EDD subscriptions and enhanced automation",
+	"author": "Code Atlantic LLC",
+	"license": "GPL-2.0-or-later",
+	"keywords": [
+		"wordpress",
+		"fluentcrm",
+		"edd",
+		"automation",
+		"subscriptions"
+	],
+	"homepage": "https://wppopupmaker.com",
+	"devDependencies": {
+		"glob": "^10.3.10"
+	},
+	"files": [
+		"classes/**/*",
+		"vendor-prefixed/**/*",
+		"*.php",
+		".phpcs.xml.dist"
+	],
+	"scripts": {
+		"release": "node bin/build-release.js"
+	}
+}
