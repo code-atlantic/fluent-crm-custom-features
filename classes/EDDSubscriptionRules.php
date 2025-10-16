@@ -71,13 +71,15 @@ class EDDSubscriptionRules {
 	 */
 	public function getConditionItems() {
 		$statuses = [
-			'any'       => __( 'Any Status', 'fluent-crm-custom-features' ),
-			'active'    => __( 'Active', 'fluent-crm-custom-features' ),
-			'expired'   => __( 'Expired', 'fluent-crm-custom-features' ),
-			'cancelled' => __( 'Cancelled', 'fluent-crm-custom-features' ),
-			'pending'   => __( 'Pending', 'fluent-crm-custom-features' ),
-			'failing'   => __( 'Failing', 'fluent-crm-custom-features' ),
-			'completed' => __( 'Completed', 'fluent-crm-custom-features' ),
+			'any'              => __( 'Any Status', 'fluent-crm-custom-features' ),
+			'active'           => __( 'Active', 'fluent-crm-custom-features' ),
+			'expired'          => __( 'Expired', 'fluent-crm-custom-features' ),
+			'cancelled'        => __( 'Cancelled', 'fluent-crm-custom-features' ),
+			'pending'          => __( 'Pending', 'fluent-crm-custom-features' ),
+			'failing'          => __( 'Failing', 'fluent-crm-custom-features' ),
+			'completed'        => __( 'Completed', 'fluent-crm-custom-features' ),
+			'needs_attention'  => __( 'Needs Attention', 'fluent-crm-custom-features' ),
+			'trash'            => __( 'Trash', 'fluent-crm-custom-features' ),
 		];
 
 		$items = [];
