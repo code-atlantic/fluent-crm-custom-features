@@ -185,8 +185,9 @@ class JSONEventTrackingHandler {
 					continue;
 				}
 
-				switch ( $prop_type ) {
-					case 'int':
+				// Sanitize prop_name to prevent SQL injection — only allow alphanumeric and underscores.
+				if ( ! preg_match( '/^[a-zA-Z0-9_]+$/', $prop_name ) ) {
+					continue;
 				}
 
 				$operator = $filter['operator'];
@@ -270,7 +271,7 @@ class JSONEventTrackingHandler {
 
 							$q
 								->where( 'event_key', $event_key_var )
-								->whereRaw( "JSON_EXTRACT(`value`, '$.{$prop_name}') LIKE '%{$escaped_value}%'" );
+								->whereRaw( "JSON_EXTRACT(`value`, '$.{$prop_name}') LIKE ?", [ '%' . $escaped_value . '%' ] );
 						}
 					);
 				} elseif ( 'not_contains' === $operator ) {
@@ -285,10 +286,9 @@ class JSONEventTrackingHandler {
 
 								$q
 									->where( 'event_key', $event_key_var )
-									->whereRaw( "JSON_EXTRACT(`value`, '$.{$prop_name}') LIKE '%{$escaped_value}%'" );
+									->whereRaw( "JSON_EXTRACT(`value`, '$.{$prop_name}') LIKE ?", [ '%' . $escaped_value . '%' ] );
 							}
 						);
-						break;
 				}
 			}
 		}
