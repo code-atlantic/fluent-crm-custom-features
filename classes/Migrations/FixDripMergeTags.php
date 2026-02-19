@@ -141,6 +141,7 @@ class FixDripMergeTags {
 		// Also fix funnel sequence settings (automation email bodies).
 		$sequences = $db->table( 'fc_funnel_sequences' )
 			->where( 'action_name', 'send_custom_email' )
+			->where( 'settings', 'LIKE', '%{{ %' )
 			->get();
 
 		foreach ( $sequences as $seq ) {
@@ -176,7 +177,10 @@ class FixDripMergeTags {
 	 */
 	public static function convertMergeTags( string $text ): string {
 		foreach ( self::$regex_replacements as $pattern => $replacement ) {
-			$text = preg_replace( $pattern, $replacement, $text );
+			$result = preg_replace( $pattern, $replacement, $text );
+			if ( $result !== null ) {
+				$text = $result;
+			}
 		}
 
 		return $text;

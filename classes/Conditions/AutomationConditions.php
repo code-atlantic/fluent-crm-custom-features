@@ -161,6 +161,6 @@ class AutomationConditions {
 			}
 		}
 
-		return true;
+		return $result;
 	}
 }
