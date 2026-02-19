@@ -12,6 +12,7 @@ use FluentCrm\Framework\Support\Arr;
  * Adds:
  * - Event Tracking conditions (check if contact has performed a specific event)
  * - Automation Completion conditions (check if contact has completed a specific funnel)
+ * - EDD License conditions (check if contact has an active license for a product)
  */
 class AutomationConditions {
 
@@ -24,6 +25,9 @@ class AutomationConditions {
 
 		// Handle evaluation of our custom "automation completed" condition.
 		add_filter( 'fluentcrm_automation_conditions_assess_automations', [ $this, 'assessAutomationConditions' ], 10, 5 );
+
+		// Handle evaluation of our custom "EDD license" condition.
+		add_filter( 'fluentcrm_automation_conditions_assess_edd_licenses', [ $this, 'assessEddLicenseConditions' ], 10, 5 );
 	}
 
 	/**
@@ -50,6 +54,15 @@ class AutomationConditions {
 			'value'    => 'automations',
 			'children' => $this->getAutomationChildren(),
 		];
+
+		// Add EDD License group.
+		if ( function_exists( 'edd_software_licensing' ) ) {
+			$groups['edd_licenses'] = [
+				'label'    => __( 'EDD Licenses', 'fluent-crm-custom-features' ),
+				'value'    => 'edd_licenses',
+				'children' => $this->getEddLicenseChildren(),
+			];
+		}
 
 		return $groups;
 	}
@@ -114,6 +127,119 @@ class AutomationConditions {
 		}
 
 		return $children;
+	}
+
+	/**
+	 * Get EDD license condition options.
+	 *
+	 * Lists all EDD downloads that have at least one license, so the condition
+	 * UI shows "Has active license for [Product Name]" yes/no.
+	 *
+	 * @return array<int,array<string,mixed>>
+	 */
+	private function getEddLicenseChildren(): array {
+		$products = fluentCrmDb()->table( 'edd_licenses' )
+			->select( 'download_id' )
+			->groupBy( 'download_id' )
+			->get();
+
+		$children = [];
+		foreach ( $products as $product ) {
+			$download = get_post( $product->download_id );
+			if ( ! $download ) {
+				continue;
+			}
+
+			$children[] = [
+				'label'             => $download->post_title,
+				'value'             => 'edd_license_' . $product->download_id,
+				'type'              => 'selections',
+				'options'           => [
+					'yes' => __( 'Yes - Has active license', 'fluent-crm-custom-features' ),
+					'no'  => __( 'No - Does not have active license', 'fluent-crm-custom-features' ),
+				],
+				'is_multiple'       => false,
+				'is_singular_value' => true,
+			];
+		}
+
+		return $children;
+	}
+
+	/**
+	 * Assess EDD license conditions.
+	 *
+	 * Checks if the subscriber has an active (or inactive) license for a specific
+	 * EDD product by querying the edd_licenses table via customer_id.
+	 *
+	 * @param bool   $result              Current result.
+	 * @param array  $conditions           Condition rules to evaluate.
+	 * @param object $subscriber           The subscriber being evaluated.
+	 * @param object $sequence             The current funnel sequence.
+	 * @param int    $funnelSubscriberId   The funnel subscriber ID.
+	 *
+	 * @return bool
+	 */
+	public function assessEddLicenseConditions( $result, $conditions, $subscriber, $sequence, $funnelSubscriberId ): bool {
+		if ( ! function_exists( 'edd_software_licensing' ) ) {
+			return false;
+		}
+
+		// Resolve the EDD customer from the subscriber's email or user_id.
+		$customer = null;
+		if ( $subscriber->user_id ) {
+			$customer = new \EDD_Customer( $subscriber->user_id, true );
+		}
+		if ( ( ! $customer || ! $customer->id ) && $subscriber->email ) {
+			$customer = new \EDD_Customer( $subscriber->email );
+		}
+		if ( ! $customer || ! $customer->id ) {
+			// No EDD customer — all "has active license" conditions fail.
+			foreach ( $conditions as $condition ) {
+				$value = $condition['data_value'] ?? 'yes';
+				if ( $value === 'yes' ) {
+					return false;
+				}
+			}
+			return $result;
+		}
+
+		foreach ( $conditions as $condition ) {
+			$prop     = $condition['data_key'];
+			$operator = $condition['operator'] ?? '=';
+			$value    = $condition['data_value'] ?? 'yes';
+
+			if ( strpos( $prop, 'edd_license_' ) !== 0 ) {
+				continue;
+			}
+
+			$download_id = (int) str_replace( 'edd_license_', '', $prop );
+			if ( ! $download_id ) {
+				continue;
+			}
+
+			$has_active_license = fluentCrmDb()->table( 'edd_licenses' )
+				->where( 'customer_id', $customer->id )
+				->where( 'download_id', $download_id )
+				->whereIn( 'status', [ 'active', 'inactive' ] )
+				->exists();
+
+			$expects_active = ( $value === 'yes' );
+
+			if ( $operator === '=' || $operator === 'in' ) {
+				if ( $has_active_license !== $expects_active ) {
+					return false;
+				}
+			} elseif ( $operator === '!=' || $operator === 'not_in' ) {
+				if ( $has_active_license === $expects_active ) {
+					return false;
+				}
+			} else {
+				return false;
+			}
+		}
+
+		return $result;
 	}
 
 	/**
