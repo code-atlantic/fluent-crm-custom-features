@@ -39,6 +39,9 @@ add_action(
 		// Enable our custom webhook handler.
 		( new \CustomCRM\Webhooks() );
 
+		// Register custom automation conditions (event tracking + automation completion).
+		( new \CustomCRM\Conditions\AutomationConditions() )->register();
+
 		// Remove the default smart link handler.
 		remove_all_actions( 'fluentcrm_smartlink_clicked' );
 		remove_all_actions( 'fluentcrm_smartlink_clicked_direct' );
