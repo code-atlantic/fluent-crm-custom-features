@@ -119,7 +119,9 @@ class FixDripMergeTags {
 			->where(function ( $q ) {
 				$q->where( 'email_body', 'LIKE', '%subscriber.%' )
 					->orWhere( 'email_body', 'LIKE', '%unsubscribe_link%' )
-					->orWhere( 'email_body', 'LIKE', '%manage_subscriptions%' );
+					->orWhere( 'email_body', 'LIKE', '%manage_subscriptions%' )
+					->orWhere( 'email_body', 'LIKE', '%inline_postal_address%' )
+					->orWhere( 'email_body', 'LIKE', '%account.name%' );
 			} )
 			->get();
 
@@ -128,13 +130,23 @@ class FixDripMergeTags {
 			$updated  = self::convertMergeTags( $original );
 
 			if ( $updated === $original ) {
+				++$stats['skipped'];
 				continue;
 			}
 
-			if ( ! $dry_run ) {
-				$db->table( 'fc_campaign_emails' )
-					->where( 'id', $email->id )
-					->update( [ 'email_body' => $updated ] );
+			if ( $dry_run ) {
+				++$stats['updated'];
+				continue;
+			}
+
+			$result = $db->table( 'fc_campaign_emails' )
+				->where( 'id', $email->id )
+				->update( [ 'email_body' => $updated ] );
+
+			if ( $result !== false ) {
+				++$stats['updated'];
+			} else {
+				++$stats['errors'];
 			}
 		}
 

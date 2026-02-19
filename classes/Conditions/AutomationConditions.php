@@ -158,6 +158,9 @@ class AutomationConditions {
 				if ( $has_completed === $expects_completed ) {
 					return false;
 				}
+			} else {
+				// Unknown operator — fail safe.
+				return false;
 			}
 		}
 
