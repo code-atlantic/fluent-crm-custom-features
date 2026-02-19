@@ -42,6 +42,9 @@ add_action(
 		// Register custom automation conditions (event tracking + automation completion).
 		( new \CustomCRM\Conditions\AutomationConditions() )->register();
 
+		// Track EDD license activations as FluentCRM events.
+		( new \CustomCRM\EddLicenseActivationTracker() )->register();
+
 		// Remove the default smart link handler.
 		remove_all_actions( 'fluentcrm_smartlink_clicked' );
 		remove_all_actions( 'fluentcrm_smartlink_clicked_direct' );
