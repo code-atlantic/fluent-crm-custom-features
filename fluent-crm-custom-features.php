@@ -63,11 +63,14 @@ add_action(
 
 		add_action( 'fluentcrm_smartlink_clicked', [ $fix_smart_link_redirects, 'handleClick' ], 9, 1 );
 		add_action( 'fluentcrm_smartlink_clicked_direct', [ $fix_smart_link_redirects, 'handleClick' ], 9, 2 );
+
+		// Custom CSS editor for FluentCRM email templates.
+		( new \CustomCRM\Integrations\CustomEmailCSS() )->register();
 	},
 	99
 );
 
-// Hook to register a custom REST API endpoint.
+// Hook to register custom REST API endpoints.
 add_action( 'rest_api_init', function () {
 	register_rest_route( 'fluent-crm/v1', '/list-growth', [
 		'methods'             => 'GET',
