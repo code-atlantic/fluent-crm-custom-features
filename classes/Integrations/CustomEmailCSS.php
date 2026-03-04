@@ -63,6 +63,8 @@ class CustomEmailCSS {
 			return $html;
 		}
 
+		$css = $this->add_important( $css );
+
 		return str_replace(
 			'</head>',
 			'<style>' . $css . '</style>' . "\n" . '</head>',
@@ -90,7 +92,8 @@ class CustomEmailCSS {
 	 * @param string $hook_suffix The current admin page hook suffix.
 	 */
 	public function enqueue_scripts( string $hook_suffix ): void {
-		if ( 'fluentcrm_page_' . self::PAGE_SLUG !== $hook_suffix ) {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if ( ! isset( $_GET['page'] ) || self::PAGE_SLUG !== $_GET['page'] ) {
 			return;
 		}
 
@@ -168,7 +171,7 @@ class CustomEmailCSS {
 				<?php
 				printf(
 					/* translators: %s: <code>!important</code> markup */
-					esc_html__( 'Add custom CSS that will be injected into all FluentCRM email templates. These styles are added after all default template CSS, so they take priority without needing %s.', 'fluent-crm-custom-features' ),
+					esc_html__( 'Add custom CSS that will be injected into all FluentCRM email templates. %s is automatically added to every declaration so your styles override inline styles and template defaults.', 'fluent-crm-custom-features' ),
 					'<code>!important</code>'
 				);
 				?>
@@ -201,6 +204,40 @@ class CustomEmailCSS {
 	 */
 	private function get_css(): string {
 		return (string) fluentcrm_get_option( self::OPTION_KEY, '' );
+	}
+
+	/**
+	 * Append !important to every CSS declaration that doesn't already have it.
+	 *
+	 * This ensures custom styles override both inline styles and template
+	 * defaults that use !important. Users write clean CSS; the flag is
+	 * added automatically at injection time.
+	 *
+	 * @param string $css The CSS to process.
+	 *
+	 * @return string CSS with !important on every declaration.
+	 */
+	private function add_important( string $css ): string {
+		// Strip any existing !important to avoid doubling.
+		$css = preg_replace( '/\s*!important\b/', '', $css );
+
+		// Match: "property: value;" — insert !important before the semicolon.
+		// Uses a negative lookbehind for { and } to skip selectors/at-rules.
+		// The pattern matches "anything : anything ;" which covers all declarations.
+		$css = preg_replace(
+			'/(:[^;{}]+?)\s*(;)/',
+			'$1 !important$2',
+			$css
+		);
+
+		// Handle the last declaration before } which may omit the semicolon.
+		$css = preg_replace(
+			'/(:[^;{}]+?)\s*(})/',
+			'$1 !important;$2',
+			$css
+		);
+
+		return $css;
 	}
 
 	/**
