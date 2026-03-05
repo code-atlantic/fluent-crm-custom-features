@@ -119,7 +119,8 @@ class CustomEmailCSS {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die(
 				esc_html__( 'You do not have permission to access this page.', 'fluent-crm-custom-features' ),
-				403
+				esc_html__( 'Forbidden', 'fluent-crm-custom-features' ),
+				[ 'response' => 403 ]
 			);
 		}
 
@@ -148,7 +149,8 @@ class CustomEmailCSS {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die(
 				esc_html__( 'You do not have permission to access this page.', 'fluent-crm-custom-features' ),
-				403
+				esc_html__( 'Forbidden', 'fluent-crm-custom-features' ),
+				[ 'response' => 403 ]
 			);
 		}
 
@@ -259,7 +261,10 @@ class CustomEmailCSS {
 			'/behavior\s*:/i',
 		];
 
-		$css = preg_replace( $dangerous, '', $css );
+		$css = preg_replace( $dangerous, '', $css ) ?? '';
+
+		// Prevent style tag breakout.
+		$css = str_replace( '</', '<\/', $css );
 
 		return trim( $css );
 	}

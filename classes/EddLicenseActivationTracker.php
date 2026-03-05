@@ -36,7 +36,7 @@ class EddLicenseActivationTracker {
 
 		$customer = new \EDD_Customer( $license->customer_id );
 
-		if ( ! $customer || ! $customer->email ) {
+		if ( ! $customer->id || ! $customer->email ) {
 			return;
 		}
 

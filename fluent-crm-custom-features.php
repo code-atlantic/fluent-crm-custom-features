@@ -104,8 +104,12 @@ function customcrm_validate_date_param( $value ) {
 		return true;
 	}
 
-	// Must match YYYY-MM-DD format.
-	return (bool) preg_match( '/^\d{4}-\d{2}-\d{2}$/', $value );
+	// Must match YYYY-MM-DD format and be a valid date.
+	if ( ! preg_match( '/^(\d{4})-(\d{2})-(\d{2})$/', $value, $matches ) ) {
+		return false;
+	}
+
+	return checkdate( (int) $matches[2], (int) $matches[3], (int) $matches[1] );
 }
 
 /**
@@ -125,13 +129,13 @@ function customcrm_get_list_growth( WP_REST_Request $request ) {
 
 	// Count new subscribers.
 	$new_subscribers = fluentCrmDb()->table( 'fc_subscribers' )
-		->whereBetween( 'created_at', [ $from, $to ] )
+		->whereBetween( 'created_at', [ $from . ' 00:00:00', $to . ' 23:59:59' ] )
 		->where( 'status', 'subscribed' )
 		->count();
 
 	// Count unsubscribed.
 	$unsubscribed = fluentCrmDb()->table( 'fc_subscriber_meta' )
-		->whereBetween( 'created_at', [ $from, $to ] )
+		->whereBetween( 'created_at', [ $from . ' 00:00:00', $to . ' 23:59:59' ] )
 		->where( 'key', 'unsubscribe_reason' )
 		->count();
 
@@ -164,12 +168,12 @@ function customcrm_add_dashboard_list_growth_metrics( $data ) {
 
 	// Calculate new subscribers and unsubscribes.
 	$new_subscribers = fluentCrmDb()->table( 'fc_subscribers' )
-		->whereBetween( 'created_at', [ $from, $to ] )
+		->whereBetween( 'created_at', [ $from . ' 00:00:00', $to . ' 23:59:59' ] )
 		->where( 'status', 'subscribed' )
 		->count();
 
 	$unsubscribed = fluentCrmDb()->table( 'fc_subscriber_meta' )
-		->whereBetween( 'created_at', [ $from, $to ] )
+		->whereBetween( 'created_at', [ $from . ' 00:00:00', $to . ' 23:59:59' ] )
 		->where( 'key', 'unsubscribe_reason' )
 		->count();
 
