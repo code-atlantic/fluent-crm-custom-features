@@ -155,11 +155,14 @@ class AutomationConditions {
 				'value'             => 'edd_license_' . $product->download_id,
 				'type'              => 'selections',
 				'options'           => [
-					'yes' => __( 'Yes - Has active license', 'fluent-crm-custom-features' ),
-					'no'  => __( 'No - Does not have active license', 'fluent-crm-custom-features' ),
+					'valid'    => __( 'Valid license (active or inactive)', 'fluent-crm-custom-features' ),
+					'active'   => __( 'Active (activated on a site)', 'fluent-crm-custom-features' ),
+					'inactive' => __( 'Inactive (not activated)', 'fluent-crm-custom-features' ),
+					'expired'  => __( 'Expired', 'fluent-crm-custom-features' ),
+					'disabled' => __( 'Disabled', 'fluent-crm-custom-features' ),
 				],
-				'is_multiple'       => false,
-				'is_singular_value' => true,
+				'is_multiple'       => true,
+				'is_singular_value' => false,
 			];
 		}
 
@@ -194,20 +197,14 @@ class AutomationConditions {
 			$customer = new \EDD_Customer( $subscriber->email );
 		}
 		if ( ! $customer || ! $customer->id ) {
-			// No EDD customer — all "has active license" conditions fail.
-			foreach ( $conditions as $condition ) {
-				$value = $condition['data_value'] ?? 'yes';
-				if ( $value === 'yes' ) {
-					return false;
-				}
-			}
-			return $result;
+			// No EDD customer — no license can match.
+			return false;
 		}
 
 		foreach ( $conditions as $condition ) {
 			$prop     = $condition['data_key'];
 			$operator = $condition['operator'] ?? '=';
-			$value    = $condition['data_value'] ?? 'yes';
+			$value    = $condition['data_value'] ?? [];
 
 			if ( strpos( $prop, 'edd_license_' ) !== 0 ) {
 				continue;
@@ -218,20 +215,38 @@ class AutomationConditions {
 				continue;
 			}
 
-			$has_active_license = fluentCrmDb()->table( 'edd_licenses' )
+			// Backward compatibility: convert old yes/no values.
+			if ( $value === 'yes' ) {
+				$value = [ 'valid' ];
+			} elseif ( $value === 'no' ) {
+				$value    = [ 'valid' ];
+				$operator = ( $operator === '=' || $operator === 'in' ) ? '!=' : '=';
+			}
+
+			// Normalize value to an array of selected options.
+			if ( ! is_array( $value ) ) {
+				$value = [ $value ];
+			}
+
+			// Map selected options to EDD license statuses.
+			$statuses = $this->mapLicenseOptionToStatuses( $value );
+
+			if ( empty( $statuses ) ) {
+				return false;
+			}
+
+			$has_matching_license = fluentCrmDb()->table( 'edd_licenses' )
 				->where( 'customer_id', $customer->id )
 				->where( 'download_id', $download_id )
-				->whereIn( 'status', [ 'active', 'inactive' ] )
+				->whereIn( 'status', $statuses )
 				->exists();
 
-			$expects_active = ( $value === 'yes' );
-
 			if ( $operator === '=' || $operator === 'in' ) {
-				if ( $has_active_license !== $expects_active ) {
+				if ( ! $has_matching_license ) {
 					return false;
 				}
 			} elseif ( $operator === '!=' || $operator === 'not_in' ) {
-				if ( $has_active_license === $expects_active ) {
+				if ( $has_matching_license ) {
 					return false;
 				}
 			} else {
@@ -240,6 +255,32 @@ class AutomationConditions {
 		}
 
 		return $result;
+	}
+
+	/**
+	 * Map UI option values to EDD license status strings.
+	 *
+	 * @param array<string> $options Selected option values (e.g. ['valid', 'expired']).
+	 *
+	 * @return array<string> EDD license statuses to query.
+	 */
+	private function mapLicenseOptionToStatuses( array $options ): array {
+		$status_map = [
+			'valid'    => [ 'active', 'inactive' ],
+			'active'   => [ 'active' ],
+			'inactive' => [ 'inactive' ],
+			'expired'  => [ 'expired' ],
+			'disabled' => [ 'disabled' ],
+		];
+
+		$statuses = [];
+		foreach ( $options as $option ) {
+			if ( isset( $status_map[ $option ] ) ) {
+				$statuses = array_merge( $statuses, $status_map[ $option ] );
+			}
+		}
+
+		return array_unique( $statuses );
 	}
 
 	/**
