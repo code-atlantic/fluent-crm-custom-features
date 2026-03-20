@@ -1,15 +1,15 @@
 <?php
 /**
  * Plugin Name: FluentCRM - Custom events, actions and conditionals.
- * Plugin URI: https://github.com/code-atlantic/fluent-crm-custom-features
+ * Plugin URI: https://github.com/GravityKit/fluent-crm-custom-features
  * Description: Custom FluentCRM features: EDD subscription filtering, JSON event tracking, custom automation actions.
  * Version: 1.0.0
  * Author: Code Atlantic LLC
  * Author URI: https://code-atlantic.com/
  * License: GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
- * GitHub Plugin URI: https://github.com/code-atlantic/fluent-crm-custom-features
- * Primary Branch: master
+ * GitHub Plugin URI: https://github.com/GravityKit/fluent-crm-custom-features
+ * Primary Branch: feature/github-updater-headers
  * Requires PHP: 7.4
  * Requires at least: 6.2
  *
