@@ -66,6 +66,15 @@ add_action(
 
 		// Custom CSS editor for FluentCRM email templates.
 		( new \CustomCRM\Integrations\CustomEmailCSS() )->register();
+
+		// Timezone-aware email sending.
+		( new \CustomCRM\Timezone\CampaignTimezoneHandler() )->register();
+		( new \CustomCRM\Timezone\AutomationTimezoneHandler() )->register();
+		( new \CustomCRM\Timezone\SequenceTimezoneHandler() )->register();
+		( new \CustomCRM\Timezone\TimezoneDetector() )->register();
+
+		// Contact and company enrichment via external providers (PDL, etc.).
+		( new \CustomCRM\Actions\EnrichContactAction() );
 	},
 	99
 );
