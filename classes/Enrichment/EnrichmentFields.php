@@ -23,9 +23,9 @@ class EnrichmentFields {
 			return;
 		}
 
-		$existing      = fluentcrm_get_option( 'contact_custom_fields', [] );
+		$existing       = fluentcrm_get_option( 'contact_custom_fields', [] );
 		$existing_slugs = array_column( $existing, 'slug' );
-		$added         = false;
+		$added          = false;
 
 		foreach ( self::getFieldDefinitions() as $field ) {
 			if ( ! in_array( $field['slug'], $existing_slugs, true ) ) {

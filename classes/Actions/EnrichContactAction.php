@@ -34,6 +34,9 @@ class EnrichContactAction extends BaseAction {
 	 */
 	private array $providers = [];
 
+	/**
+	 * EnrichContactAction constructor.
+	 */
 	public function __construct() {
 		// phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
 		$this->actionName = 'enrich_contact';
@@ -124,9 +127,9 @@ class EnrichContactAction extends BaseAction {
 					'check_label' => __( 'Re-enrich contacts that have already been enriched', 'fluent-crm-custom-features' ),
 				],
 				'company_handling' => [
-					'type'    => 'radio',
-					'label'   => __( 'Company Handling', 'fluent-crm-custom-features' ),
-					'options' => [
+					'type'       => 'radio',
+					'label'      => __( 'Company Handling', 'fluent-crm-custom-features' ),
+					'options'    => [
 						[
 							'id'    => 'create_or_update',
 							'title' => __( 'Create or update company', 'fluent-crm-custom-features' ),
@@ -167,10 +170,10 @@ class EnrichContactAction extends BaseAction {
 	/**
 	 * Execute the enrichment action.
 	 *
-	 * @param \FluentCrm\App\Models\Subscriber       $subscriber          The subscriber.
-	 * @param \FluentCrm\App\Models\FunnelSequence    $sequence            The funnel sequence.
-	 * @param int                                     $funnel_subscriber_id Funnel subscriber ID.
-	 * @param mixed                                   $funnel_metric       Funnel metric.
+	 * @param \FluentCrm\App\Models\Subscriber     $subscriber          The subscriber.
+	 * @param \FluentCrm\App\Models\FunnelSequence $sequence            The funnel sequence.
+	 * @param int                                  $funnel_subscriber_id Funnel subscriber ID.
+	 * @param mixed                                $funnel_metric       Funnel metric.
 	 */
 	public function handle( $subscriber, $sequence, $funnel_subscriber_id, $funnel_metric ) {
 		$settings = $sequence->settings;
@@ -274,11 +277,11 @@ class EnrichContactAction extends BaseAction {
 	 * Run person enrichment and apply results to the subscriber.
 	 *
 	 * @param EnrichmentProvider $provider              The provider.
-	 * @param Subscriber        $subscriber             The subscriber.
-	 * @param int               $min_likelihood         Minimum likelihood threshold.
-	 * @param string            $data_behavior          'fill_empty' or 'overwrite'.
-	 * @param int               $funnel_subscriber_id   Funnel subscriber ID.
-	 * @param mixed             $sequence               The funnel sequence.
+	 * @param Subscriber         $subscriber             The subscriber.
+	 * @param int                $min_likelihood         Minimum likelihood threshold.
+	 * @param string             $data_behavior          'fill_empty' or 'overwrite'.
+	 * @param int                $funnel_subscriber_id   Funnel subscriber ID.
+	 * @param mixed              $sequence               The funnel sequence.
 	 *
 	 * @return PersonResult|EnrichmentError|null
 	 */
@@ -328,7 +331,7 @@ class EnrichContactAction extends BaseAction {
 		}
 
 		// Map custom fields.
-		$custom_fields = $result->toCustomFields();
+		$custom_fields                        = $result->toCustomFields();
 		$custom_fields['enriched_at']         = current_time( 'mysql' );
 		$custom_fields['enrichment_provider'] = $provider->getSlug();
 
@@ -352,14 +355,14 @@ class EnrichContactAction extends BaseAction {
 	 * Run company enrichment and apply results.
 	 *
 	 * @param EnrichmentProvider $provider              The provider.
-	 * @param Subscriber        $subscriber             The subscriber.
-	 * @param mixed             $person_result          PersonResult or null.
-	 * @param bool              $is_company_trigger     Whether this is a company-triggered funnel.
-	 * @param int               $min_likelihood         Minimum likelihood threshold.
-	 * @param string            $data_behavior          'fill_empty' or 'overwrite'.
-	 * @param string            $company_handling       Company handling mode.
-	 * @param int               $funnel_subscriber_id   Funnel subscriber ID.
-	 * @param mixed             $sequence               The funnel sequence.
+	 * @param Subscriber         $subscriber             The subscriber.
+	 * @param mixed              $person_result          PersonResult or null.
+	 * @param bool               $is_company_trigger     Whether this is a company-triggered funnel.
+	 * @param int                $min_likelihood         Minimum likelihood threshold.
+	 * @param string             $data_behavior          'fill_empty' or 'overwrite'.
+	 * @param string             $company_handling       Company handling mode.
+	 * @param int                $funnel_subscriber_id   Funnel subscriber ID.
+	 * @param mixed              $sequence               The funnel sequence.
 	 *
 	 * @return CompanyResult|EnrichmentError|null
 	 */
@@ -553,11 +556,11 @@ class EnrichContactAction extends BaseAction {
 	/**
 	 * Store company data in contact custom fields (when company_handling = 'none').
 	 *
-	 * @param Subscriber    $subscriber    The subscriber.
-	 * @param CompanyResult $result        The company enrichment result.
-	 * @param string        $match_type    'confirmed' or 'inferred'.
-	 * @param string        $provider_slug Provider slug.
-	 * @param string        $data_behavior 'fill_empty' or 'overwrite'.
+	 * @param Subscriber    $subscriber     The subscriber.
+	 * @param CompanyResult $result         The company enrichment result.
+	 * @param string        $match_type     'confirmed' or 'inferred'.
+	 * @param string        $_provider_slug Provider slug (reserved for future use).
+	 * @param string        $data_behavior  'fill_empty' or 'overwrite'.
 	 */
 	private function storeCompanyInCustomFields(
 		Subscriber $subscriber,
@@ -618,8 +621,8 @@ class EnrichContactAction extends BaseAction {
 	/**
 	 * Filter subscriber fields to only those that are currently empty.
 	 *
-	 * @param Subscriber           $subscriber Subscriber model.
-	 * @param array<string,mixed>  $fields     Fields to filter.
+	 * @param Subscriber          $subscriber Subscriber model.
+	 * @param array<string,mixed> $fields     Fields to filter.
 	 *
 	 * @return array<string,mixed>
 	 */
@@ -637,8 +640,8 @@ class EnrichContactAction extends BaseAction {
 	 * Uses Subscriber::getMeta() to check each field individually since FluentCRM
 	 * stores custom field values as individual meta rows.
 	 *
-	 * @param Subscriber           $subscriber Subscriber model.
-	 * @param array<string,mixed>  $fields     Custom field slug => value.
+	 * @param Subscriber          $subscriber Subscriber model.
+	 * @param array<string,mixed> $fields     Custom field slug => value.
 	 *
 	 * @return array<string,mixed>
 	 */
@@ -659,8 +662,8 @@ class EnrichContactAction extends BaseAction {
 	/**
 	 * Filter company fields to only those that are currently empty.
 	 *
-	 * @param Company              $company Company model.
-	 * @param array<string,mixed>  $fields  Fields to filter.
+	 * @param Company             $company Company model.
+	 * @param array<string,mixed> $fields  Fields to filter.
 	 *
 	 * @return array<string,mixed>
 	 */
@@ -675,8 +678,8 @@ class EnrichContactAction extends BaseAction {
 	/**
 	 * Detect if this is a company-triggered funnel.
 	 *
-	 * @param Subscriber $subscriber The subscriber.
-	 * @param mixed      $sequence   The funnel sequence.
+	 * @param Subscriber $_subscriber The subscriber (unused, context detection uses sequence).
+	 * @param mixed      $sequence    The funnel sequence.
 	 *
 	 * @return bool
 	 */

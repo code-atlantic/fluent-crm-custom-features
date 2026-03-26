@@ -59,8 +59,8 @@ class EnrichmentSettings {
 	 * @param array<string,mixed> $settings Provider-specific settings.
 	 */
 	public static function saveProviderSettings( string $slug, array $settings ): void {
-		$all                          = self::getAll();
-		$all['providers'][ $slug ]    = $settings;
+		$all                       = self::getAll();
+		$all['providers'][ $slug ] = $settings;
 
 		// Auto-set active provider if none set.
 		if ( empty( $all['active_provider'] ) ) {
@@ -111,8 +111,8 @@ class EnrichmentSettings {
 		$key = self::getEncryptionKey();
 
 		if ( function_exists( 'openssl_encrypt' ) ) {
-			$iv         = openssl_random_pseudo_bytes( 16 );
-			$encrypted  = openssl_encrypt( $value, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv );
+			$iv        = openssl_random_pseudo_bytes( 16 );
+			$encrypted = openssl_encrypt( $value, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv );
 
 			if ( false !== $encrypted ) {
 				// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
@@ -135,8 +135,8 @@ class EnrichmentSettings {
 	public static function decrypt( string $encrypted ): string {
 		if ( str_starts_with( $encrypted, 'enc:' ) && function_exists( 'openssl_decrypt' ) ) {
 			// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
-			$raw = base64_decode( substr( $encrypted, 4 ) );
-			$iv  = substr( $raw, 0, 16 );
+			$raw  = base64_decode( substr( $encrypted, 4 ) );
+			$iv   = substr( $raw, 0, 16 );
 			$data = substr( $raw, 16 );
 			$key  = self::getEncryptionKey();
 

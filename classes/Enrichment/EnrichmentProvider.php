@@ -66,8 +66,8 @@ abstract class EnrichmentProvider {
 	/**
 	 * Map a provider-specific HTTP error to a normalized EnrichmentError.
 	 *
-	 * @param int                  $http_status   HTTP status code.
-	 * @param array<string,mixed>  $response_body Decoded response body.
+	 * @param int                 $http_status   HTTP status code.
+	 * @param array<string,mixed> $response_body Decoded response body.
 	 *
 	 * @return EnrichmentError
 	 */
