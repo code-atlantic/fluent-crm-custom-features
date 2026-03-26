@@ -71,8 +71,9 @@ class FreeEmailDetector {
 		 * @param string[] $domains Array of domain strings (e.g., 'gmail.com').
 		 */
 		$domains = apply_filters( 'custom_crm/free_email_domains', self::DOMAINS );
+		$domains = array_map( 'strtolower', $domains );
 
-		return in_array( strtolower( $domain ), $domains, true );
+		return in_array( $domain, $domains, true );
 	}
 
 	/**

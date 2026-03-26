@@ -103,53 +103,73 @@ class EnrichmentSettings {
 	/**
 	 * Encrypt a value for storage using OpenSSL with WordPress AUTH_KEY as the key.
 	 *
+	 * Requires the OpenSSL extension. Returns empty string on failure.
+	 *
 	 * @param string $value Plain text value.
 	 *
-	 * @return string Encrypted string (base64-encoded with 'enc:' prefix).
+	 * @return string Encrypted string (base64-encoded with 'enc:' prefix), or empty on failure.
 	 */
 	public static function encrypt( string $value ): string {
-		$key = self::getEncryptionKey();
-
-		if ( function_exists( 'openssl_encrypt' ) ) {
-			$iv        = openssl_random_pseudo_bytes( 16 );
-			$encrypted = openssl_encrypt( $value, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv );
-
-			if ( false !== $encrypted ) {
-				// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
-				return 'enc:' . base64_encode( $iv . $encrypted );
-			}
+		if ( ! function_exists( 'openssl_encrypt' ) ) {
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			error_log( '[CustomCRM Enrichment] OpenSSL extension required for API key encryption.' );
+			return '';
 		}
 
-		// Fallback if OpenSSL unavailable: base64 obfuscation only.
+		$key = self::getEncryptionKey();
+		$iv  = openssl_random_pseudo_bytes( 16 );
+
+		if ( false === $iv ) {
+			return '';
+		}
+
+		$encrypted = openssl_encrypt( $value, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv );
+
+		if ( false === $encrypted ) {
+			return '';
+		}
+
 		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
-		return 'b64:' . base64_encode( $value );
+		return 'enc:' . base64_encode( $iv . $encrypted );
 	}
 
 	/**
 	 * Decrypt a stored value.
 	 *
+	 * Returns empty string if decryption fails (corrupted data, missing OpenSSL, etc.).
+	 *
 	 * @param string $encrypted Encrypted string.
 	 *
-	 * @return string Decrypted value.
+	 * @return string Decrypted value, or empty string on failure.
 	 */
 	public static function decrypt( string $encrypted ): string {
-		if ( str_starts_with( $encrypted, 'enc:' ) && function_exists( 'openssl_decrypt' ) ) {
+		if ( 0 === strpos( $encrypted, 'enc:' ) ) {
+			if ( ! function_exists( 'openssl_decrypt' ) ) {
+				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+				error_log( '[CustomCRM Enrichment] OpenSSL extension required to decrypt API key.' );
+				return '';
+			}
+
 			// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
-			$raw  = base64_decode( substr( $encrypted, 4 ) );
+			$raw = base64_decode( substr( $encrypted, 4 ), true );
+
+			if ( false === $raw || strlen( $raw ) < 17 ) {
+				return '';
+			}
+
 			$iv   = substr( $raw, 0, 16 );
 			$data = substr( $raw, 16 );
 			$key  = self::getEncryptionKey();
 
 			$decrypted = openssl_decrypt( $data, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv );
 
-			if ( false !== $decrypted ) {
-				return $decrypted;
-			}
+			return ( false !== $decrypted ) ? $decrypted : '';
 		}
 
-		if ( str_starts_with( $encrypted, 'b64:' ) ) {
+		if ( 0 === strpos( $encrypted, 'b64:' ) ) {
 			// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
-			return base64_decode( substr( $encrypted, 4 ) );
+			$decoded = base64_decode( substr( $encrypted, 4 ), true );
+			return ( false !== $decoded ) ? $decoded : '';
 		}
 
 		// Plain text from old storage.
@@ -159,10 +179,18 @@ class EnrichmentSettings {
 	/**
 	 * Derive an encryption key from WordPress salts.
 	 *
+	 * Logs a warning if AUTH_KEY is not defined (shared fallback key is insecure).
+	 *
 	 * @return string 32-byte key.
 	 */
 	private static function getEncryptionKey(): string {
-		$salt = defined( 'AUTH_KEY' ) ? AUTH_KEY : 'custom-crm-fallback-key';
+		if ( ! defined( 'AUTH_KEY' ) || '' === AUTH_KEY ) {
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			error_log( '[CustomCRM Enrichment] AUTH_KEY not defined; using weak fallback for encryption.' );
+			$salt = 'custom-crm-fallback-key';
+		} else {
+			$salt = AUTH_KEY;
+		}
 
 		return hash( 'sha256', $salt, true );
 	}

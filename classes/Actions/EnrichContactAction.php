@@ -449,7 +449,9 @@ class EnrichContactAction extends BaseAction {
 
 		$this->log( 'info', "Company enrichment successful: {$result->name} ({$match_type})" );
 
-		do_action( 'custom_crm/company_enriched', $company, $result );
+		if ( $company ) {
+			do_action( 'custom_crm/company_enriched', $company, $result );
+		}
 
 		return $result;
 	}
@@ -475,7 +477,8 @@ class EnrichContactAction extends BaseAction {
 		// Try to find by website domain.
 		if ( $result->website ) {
 			$normalized = $this->normalizeDomain( $result->website );
-			$company    = Company::where( 'website', 'LIKE', "%{$normalized}%" )->first();
+			$escaped    = addcslashes( $normalized, '%_' );
+			$company    = Company::where( 'website', 'LIKE', "%{$escaped}%" )->first();
 		}
 
 		// Fallback: find by exact name.
@@ -704,8 +707,8 @@ class EnrichContactAction extends BaseAction {
 	 */
 	private function normalizeDomain( string $url ): string {
 		$domain = strtolower( $url );
-		$domain = preg_replace( '#^https?://#', '', $domain );
-		$domain = preg_replace( '#^www\.#', '', $domain );
+		$domain = preg_replace( '#^https?://#', '', $domain ) ?? $domain;
+		$domain = preg_replace( '#^www\.#', '', $domain ) ?? $domain;
 		$domain = rtrim( $domain, '/' );
 
 		return $domain;
