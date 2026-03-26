@@ -101,23 +101,26 @@ class EnrichmentSettings {
 	}
 
 	/**
-	 * Encrypt a value for storage.
-	 *
-	 * Uses wp_encrypt() on WP 6.5+, falls back to base64 with site salt.
+	 * Encrypt a value for storage using OpenSSL with WordPress AUTH_KEY as the key.
 	 *
 	 * @param string $value Plain text value.
 	 *
-	 * @return string Encrypted string.
+	 * @return string Encrypted string (base64-encoded with 'enc:' prefix).
 	 */
 	public static function encrypt( string $value ): string {
-		if ( function_exists( 'wp_encrypt' ) ) {
-			$result = wp_encrypt( $value );
-			if ( ! is_wp_error( $result ) ) {
-				return $result;
+		$key = self::getEncryptionKey();
+
+		if ( function_exists( 'openssl_encrypt' ) ) {
+			$iv         = openssl_random_pseudo_bytes( 16 );
+			$encrypted  = openssl_encrypt( $value, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv );
+
+			if ( false !== $encrypted ) {
+				// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
+				return 'enc:' . base64_encode( $iv . $encrypted );
 			}
 		}
 
-		// Fallback: base64 with salt prefix for identification.
+		// Fallback if OpenSSL unavailable: base64 obfuscation only.
 		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
 		return 'b64:' . base64_encode( $value );
 	}
@@ -130,19 +133,37 @@ class EnrichmentSettings {
 	 * @return string Decrypted value.
 	 */
 	public static function decrypt( string $encrypted ): string {
+		if ( str_starts_with( $encrypted, 'enc:' ) && function_exists( 'openssl_decrypt' ) ) {
+			// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
+			$raw = base64_decode( substr( $encrypted, 4 ) );
+			$iv  = substr( $raw, 0, 16 );
+			$data = substr( $raw, 16 );
+			$key  = self::getEncryptionKey();
+
+			$decrypted = openssl_decrypt( $data, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv );
+
+			if ( false !== $decrypted ) {
+				return $decrypted;
+			}
+		}
+
 		if ( str_starts_with( $encrypted, 'b64:' ) ) {
 			// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
 			return base64_decode( substr( $encrypted, 4 ) );
 		}
 
-		if ( function_exists( 'wp_decrypt' ) ) {
-			$result = wp_decrypt( $encrypted );
-			if ( ! is_wp_error( $result ) ) {
-				return $result;
-			}
-		}
-
-		// If we can't decrypt, return as-is (may be plain text from old storage).
+		// Plain text from old storage.
 		return $encrypted;
+	}
+
+	/**
+	 * Derive an encryption key from WordPress salts.
+	 *
+	 * @return string 32-byte key.
+	 */
+	private static function getEncryptionKey(): string {
+		$salt = defined( 'AUTH_KEY' ) ? AUTH_KEY : 'custom-crm-fallback-key';
+
+		return hash( 'sha256', $salt, true );
 	}
 }
