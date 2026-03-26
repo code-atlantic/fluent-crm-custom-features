@@ -563,7 +563,7 @@ class EnrichContactAction extends BaseAction {
 		Subscriber $subscriber,
 		CompanyResult $result,
 		string $match_type,
-		string $provider_slug,
+		string $_provider_slug,
 		string $data_behavior
 	): void {
 		EnrichmentFields::ensureFieldsExist();
@@ -626,7 +626,7 @@ class EnrichContactAction extends BaseAction {
 	private function filterEmptyOnly( Subscriber $subscriber, array $fields ): array {
 		return array_filter(
 			$fields,
-			static fn( $value, $key ) => empty( $subscriber->$key ),
+			static fn( $_value, $key ) => empty( $subscriber->$key ),
 			ARRAY_FILTER_USE_BOTH
 		);
 	}
@@ -645,7 +645,7 @@ class EnrichContactAction extends BaseAction {
 	private function filterEmptyCustomFieldsOnly( Subscriber $subscriber, array $fields ): array {
 		return array_filter(
 			$fields,
-			static function ( $value, $key ) use ( $subscriber ) {
+			static function ( $_value, $key ) use ( $subscriber ) {
 				$existing = $subscriber->getMeta( $key, 'custom_field' );
 
 				// getMeta() returns false when the meta row doesn't exist.
@@ -667,7 +667,7 @@ class EnrichContactAction extends BaseAction {
 	private function filterEmptyCompanyFields( Company $company, array $fields ): array {
 		return array_filter(
 			$fields,
-			static fn( $value, $key ) => empty( $company->$key ),
+			static fn( $_value, $key ) => empty( $company->$key ),
 			ARRAY_FILTER_USE_BOTH
 		);
 	}
@@ -680,11 +680,11 @@ class EnrichContactAction extends BaseAction {
 	 *
 	 * @return bool
 	 */
-	private function isCompanyTriggered( Subscriber $subscriber, $sequence ): bool {
+	private function isCompanyTriggered( Subscriber $_subscriber, $sequence ): bool {
 		// Check funnel trigger name if available.
 		if ( isset( $sequence->funnel ) && isset( $sequence->funnel->trigger_name ) ) {
 			$trigger = $sequence->funnel->trigger_name;
-			if ( str_contains( $trigger, 'company' ) ) {
+			if ( false !== strpos( $trigger, 'company' ) ) {
 				return true;
 			}
 		}
@@ -794,8 +794,8 @@ class EnrichContactAction extends BaseAction {
 	 * @param string $message Log message.
 	 */
 	private function log( string $level, string $message ): void {
-		if ( function_exists( 'fluentCrmLog' ) ) {
-			fluentCrmLog( $message );
+		if ( function_exists( '\fluentCrmLog' ) ) {
+			\fluentCrmLog( $message ); // phpcs:ignore WordPress.NamingConventions.ValidFunctionName.FunctionNameInvalid
 		}
 
 		if ( defined( 'WP_DEBUG_LOG' ) && WP_DEBUG_LOG ) {
