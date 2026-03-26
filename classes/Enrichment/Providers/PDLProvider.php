@@ -63,6 +63,8 @@ class PDLProvider extends EnrichmentProvider {
 
 	/**
 	 * {@inheritDoc}
+	 *
+	 * @param array<string,mixed> $settings Provider settings to validate.
 	 */
 	public function validateSettings( array $settings ) {
 		$api_key = $settings['api_key'] ?? '';
@@ -100,6 +102,8 @@ class PDLProvider extends EnrichmentProvider {
 
 	/**
 	 * {@inheritDoc}
+	 *
+	 * @param array<string,mixed> $params Enrichment parameters (email, first_name, etc.).
 	 */
 	public function enrichPerson( array $params ) {
 		$api_key = $this->getApiKey();
@@ -115,31 +119,33 @@ class PDLProvider extends EnrichmentProvider {
 
 		$query = array_filter(
 			[
-				'email'            => $params['email'] ?? '',
-				'first_name'       => $params['first_name'] ?? '',
-				'last_name'        => $params['last_name'] ?? '',
-				'company'          => $params['company'] ?? '',
-				'location'         => $params['location'] ?? '',
-				'min_likelihood'   => $params['min_likelihood'] ?? 6,
+				'email'              => $params['email'] ?? '',
+				'first_name'         => $params['first_name'] ?? '',
+				'last_name'          => $params['last_name'] ?? '',
+				'company'            => $params['company'] ?? '',
+				'location'           => $params['location'] ?? '',
+				'min_likelihood'     => $params['min_likelihood'] ?? 6,
 				'include_if_matched' => 'true',
-				'titlecase'        => 'true',
-				'pretty'           => 'false',
+				'titlecase'          => 'true',
+				'pretty'             => 'false',
 			],
 			static fn( $v ) => '' !== $v && null !== $v
 		);
 
-		$url    = add_query_arg( $query, self::PERSON_ENDPOINT );
-		$result = $this->httpGet( $url, [ 'X-Api-Key' => $api_key ] );
+			$url    = add_query_arg( $query, self::PERSON_ENDPOINT );
+			$result = $this->httpGet( $url, [ 'X-Api-Key' => $api_key ] );
 
-		if ( $result instanceof EnrichmentError ) {
-			return $result;
-		}
+			if ( $result instanceof EnrichmentError ) {
+				return $result;
+			}
 
-		return $this->mapPersonResponse( $result['body'] );
+			return $this->mapPersonResponse( $result['body'] );
 	}
 
 	/**
 	 * {@inheritDoc}
+	 *
+	 * @param array<string,mixed> $params Enrichment parameters (website, name, linkedin_url, etc.).
 	 */
 	public function enrichCompany( array $params ) {
 		$api_key = $this->getApiKey();
@@ -155,29 +161,32 @@ class PDLProvider extends EnrichmentProvider {
 
 		$query = array_filter(
 			[
-				'website'          => $params['website'] ?? '',
-				'name'             => $params['name'] ?? '',
-				'profile'          => $params['linkedin_url'] ?? '',
-				'min_likelihood'   => $params['min_likelihood'] ?? 2,
+				'website'            => $params['website'] ?? '',
+				'name'               => $params['name'] ?? '',
+				'profile'            => $params['linkedin_url'] ?? '',
+				'min_likelihood'     => $params['min_likelihood'] ?? 2,
 				'include_if_matched' => 'true',
-				'titlecase'        => 'true',
-				'pretty'           => 'false',
+				'titlecase'          => 'true',
+				'pretty'             => 'false',
 			],
 			static fn( $v ) => '' !== $v && null !== $v
 		);
 
-		$url    = add_query_arg( $query, self::COMPANY_ENDPOINT );
-		$result = $this->httpGet( $url, [ 'X-Api-Key' => $api_key ] );
+			$url    = add_query_arg( $query, self::COMPANY_ENDPOINT );
+			$result = $this->httpGet( $url, [ 'X-Api-Key' => $api_key ] );
 
-		if ( $result instanceof EnrichmentError ) {
-			return $result;
-		}
+			if ( $result instanceof EnrichmentError ) {
+				return $result;
+			}
 
-		return $this->mapCompanyResponse( $result['body'] );
+			return $this->mapCompanyResponse( $result['body'] );
 	}
 
 	/**
 	 * {@inheritDoc}
+	 *
+	 * @param int                 $http_status   HTTP status code from the provider.
+	 * @param array<string,mixed> $response_body Decoded response body.
 	 */
 	protected function mapError( int $http_status, array $response_body ): EnrichmentError {
 		$message = $response_body['error']['message'] ?? "HTTP {$http_status}";
@@ -185,7 +194,7 @@ class PDLProvider extends EnrichmentProvider {
 		return match ( $http_status ) {
 			400     => new EnrichmentError( EnrichmentError::INVALID_INPUT, $message, 400, false ),
 			401     => new EnrichmentError( EnrichmentError::AUTH_FAILED, $message, 401, false ),
-			402,403 => new EnrichmentError( EnrichmentError::QUOTA_EXCEEDED, $message, $http_status, false ),
+			402, 403 => new EnrichmentError( EnrichmentError::QUOTA_EXCEEDED, $message, $http_status, false ),
 			404     => new EnrichmentError( EnrichmentError::NO_MATCH, 'No matching record found.', 404, false ),
 			429     => new EnrichmentError( EnrichmentError::RATE_LIMITED, $message, 429, true ),
 			default => new EnrichmentError(
@@ -208,24 +217,24 @@ class PDLProvider extends EnrichmentProvider {
 		$data   = $body['data'] ?? $body;
 		$result = new PersonResult();
 
-		$result->first_name     = $data['first_name'] ?? null;
-		$result->last_name      = $data['last_name'] ?? null;
-		$result->phone          = $data['mobile_phone'] ?? ( $data['phone_numbers'][0] ?? null );
-		$result->city           = $data['location_locality'] ?? null;
-		$result->state          = $data['location_region'] ?? null;
-		$result->country        = $data['location_country'] ?? null;
-		$result->postal_code    = $data['location_postal_code'] ?? null;
-		$result->address_line_1 = $data['location_street_address'] ?? null;
-		$result->date_of_birth  = $data['birth_date'] ?? null;
-		$result->linkedin_url   = $data['linkedin_url'] ?? null;
-		$result->twitter_url    = $data['twitter_url'] ?? null;
-		$result->facebook_url   = $data['facebook_url'] ?? null;
-		$result->github_url     = $data['github_url'] ?? null;
-		$result->job_title      = $data['job_title'] ?? null;
-		$result->job_role       = $data['job_title_role'] ?? null;
-		$result->industry       = $data['industry'] ?? ( $data['job_company_industry'] ?? null );
+		$result->first_name      = $data['first_name'] ?? null;
+		$result->last_name       = $data['last_name'] ?? null;
+		$result->phone           = $data['mobile_phone'] ?? ( $data['phone_numbers'][0] ?? null );
+		$result->city            = $data['location_locality'] ?? null;
+		$result->state           = $data['location_region'] ?? null;
+		$result->country         = $data['location_country'] ?? null;
+		$result->postal_code     = $data['location_postal_code'] ?? null;
+		$result->address_line_1  = $data['location_street_address'] ?? null;
+		$result->date_of_birth   = $data['birth_date'] ?? null;
+		$result->linkedin_url    = $data['linkedin_url'] ?? null;
+		$result->twitter_url     = $data['twitter_url'] ?? null;
+		$result->facebook_url    = $data['facebook_url'] ?? null;
+		$result->github_url      = $data['github_url'] ?? null;
+		$result->job_title       = $data['job_title'] ?? null;
+		$result->job_role        = $data['job_title_role'] ?? null;
+		$result->industry        = $data['industry'] ?? ( $data['job_company_industry'] ?? null );
 		$result->inferred_salary = $data['inferred_salary'] ?? null;
-		$result->sex            = $data['sex'] ?? null;
+		$result->sex             = $data['sex'] ?? null;
 
 		// Derive pronouns from sex if available.
 		if ( $result->sex && null === $result->pronouns ) {
@@ -237,7 +246,7 @@ class PDLProvider extends EnrichmentProvider {
 		}
 
 		// Job level: PDL returns an array, take the first.
-		$levels = $data['job_title_levels'] ?? [];
+		$levels            = $data['job_title_levels'] ?? [];
 		$result->job_level = is_array( $levels ) && $levels ? $levels[0] : null;
 
 		// Company data from person response.
@@ -247,14 +256,13 @@ class PDLProvider extends EnrichmentProvider {
 		// Geo coordinates.
 		$geo = $data['location_geo'] ?? null;
 		if ( $geo && is_string( $geo ) && str_contains( $geo, ',' ) ) {
-			$parts = explode( ',', $geo );
+			$parts             = explode( ',', $geo );
 			$result->latitude  = (float) trim( $parts[0] );
 			$result->longitude = (float) trim( $parts[1] );
 		}
 
 		$result->likelihood = $body['likelihood'] ?? null;
 
-		/** @var PersonResult */
 		return apply_filters( 'custom_crm/enrichment_person_result', $result, $body );
 	}
 
@@ -312,7 +320,6 @@ class PDLProvider extends EnrichmentProvider {
 
 		$result->likelihood = $body['likelihood'] ?? null;
 
-		/** @var CompanyResult */
 		return apply_filters( 'custom_crm/enrichment_company_result', $result, $body );
 	}
 

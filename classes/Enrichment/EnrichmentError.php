@@ -12,27 +12,58 @@ namespace CustomCRM\Enrichment;
  */
 class EnrichmentError {
 
-	public const NO_MATCH       = 'no_match';
-	public const INVALID_INPUT  = 'invalid_input';
-	public const AUTH_FAILED    = 'auth_failed';
-	public const RATE_LIMITED   = 'rate_limited';
-	public const QUOTA_EXCEEDED = 'quota_exceeded';
-	public const PROVIDER_ERROR = 'provider_error';
-	public const NETWORK_ERROR  = 'network_error';
+	/** No matching record found. */
+	public const NO_MATCH = 'no_match';
 
-	/** @var string Normalized error code (use class constants). */
+	/** Input data was invalid or insufficient. */
+	public const INVALID_INPUT = 'invalid_input';
+
+	/** API authentication failed (bad or missing key). */
+	public const AUTH_FAILED = 'auth_failed';
+
+	/** Request was rate-limited by the provider. */
+	public const RATE_LIMITED = 'rate_limited';
+
+	/** API quota or credit limit exceeded. */
+	public const QUOTA_EXCEEDED = 'quota_exceeded';
+
+	/** The provider returned an unexpected server error. */
+	public const PROVIDER_ERROR = 'provider_error';
+
+	/** A network-level error occurred before a response was received. */
+	public const NETWORK_ERROR = 'network_error';
+
+	/**
+	 * Normalized error code (use class constants).
+	 *
+	 * @var string
+	 */
 	public string $code;
 
-	/** @var string Human-readable error message. */
+	/**
+	 * Human-readable error message.
+	 *
+	 * @var string
+	 */
 	public string $message;
 
-	/** @var int|null Raw HTTP status from the provider. */
+	/**
+	 * Raw HTTP status from the provider.
+	 *
+	 * @var int|null
+	 */
 	public ?int $http_status;
 
-	/** @var bool Whether the caller should retry. */
+	/**
+	 * Whether the caller should retry.
+	 *
+	 * @var bool
+	 */
 	public bool $retryable;
 
 	/**
+	 * Create a new enrichment error.
+	 *
 	 * @param string   $code        One of the class constants.
 	 * @param string   $message     Human-readable message.
 	 * @param int|null $http_status Raw HTTP status code.

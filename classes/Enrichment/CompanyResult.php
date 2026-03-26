@@ -15,34 +15,184 @@ namespace CustomCRM\Enrichment;
 class CompanyResult {
 
 	// --- Native Company fields ---
-	public ?string $name             = null;
-	public ?string $industry         = null;
-	public ?string $type             = null;
-	public ?string $website          = null;
-	public ?string $email            = null;
-	public ?string $phone            = null;
-	public ?string $address_line_1   = null;
-	public ?string $city             = null;
-	public ?string $state            = null;
-	public ?string $country          = null;
-	public ?string $postal_code      = null;
-	public ?int    $employees_number = null;
-	public ?string $description      = null;
-	public ?string $logo             = null;
-	public ?string $linkedin_url     = null;
-	public ?string $facebook_url     = null;
-	public ?string $twitter_url      = null;
-	public ?string $date_of_start    = null;
+
+	/**
+	 * Company display name.
+	 *
+	 * @var string|null
+	 */
+	public ?string $name = null;
+
+	/**
+	 * Industry sector.
+	 *
+	 * @var string|null
+	 */
+	public ?string $industry = null;
+
+	/**
+	 * Company type (e.g. public, private).
+	 *
+	 * @var string|null
+	 */
+	public ?string $type = null;
+
+	/**
+	 * Company website URL.
+	 *
+	 * @var string|null
+	 */
+	public ?string $website = null;
+
+	/**
+	 * Company contact email.
+	 *
+	 * @var string|null
+	 */
+	public ?string $email = null;
+
+	/**
+	 * Company phone number.
+	 *
+	 * @var string|null
+	 */
+	public ?string $phone = null;
+
+	/**
+	 * Street address line 1.
+	 *
+	 * @var string|null
+	 */
+	public ?string $address_line_1 = null;
+
+	/**
+	 * City.
+	 *
+	 * @var string|null
+	 */
+	public ?string $city = null;
+
+	/**
+	 * State or region.
+	 *
+	 * @var string|null
+	 */
+	public ?string $state = null;
+
+	/**
+	 * Country.
+	 *
+	 * @var string|null
+	 */
+	public ?string $country = null;
+
+	/**
+	 * Postal code.
+	 *
+	 * @var string|null
+	 */
+	public ?string $postal_code = null;
+
+	/**
+	 * Number of employees.
+	 *
+	 * @var int|null
+	 */
+	public ?int $employees_number = null;
+
+	/**
+	 * Company description.
+	 *
+	 * @var string|null
+	 */
+	public ?string $description = null;
+
+	/**
+	 * Logo URL.
+	 *
+	 * @var string|null
+	 */
+	public ?string $logo = null;
+
+	/**
+	 * LinkedIn company page URL.
+	 *
+	 * @var string|null
+	 */
+	public ?string $linkedin_url = null;
+
+	/**
+	 * Facebook company page URL.
+	 *
+	 * @var string|null
+	 */
+	public ?string $facebook_url = null;
+
+	/**
+	 * Twitter/X company profile URL.
+	 *
+	 * @var string|null
+	 */
+	public ?string $twitter_url = null;
+
+	/**
+	 * Founded year or date.
+	 *
+	 * @var string|null
+	 */
+	public ?string $date_of_start = null;
 
 	// --- Extra metadata (stored in Company meta JSON) ---
-	public ?int    $funding_raised              = null;
-	public ?string $funding_stage               = null;
-	public ?string $inferred_revenue            = null;
-	public ?float  $employee_growth_rate_12mo   = null;
-	public ?string $ticker                      = null;
-	public ?array  $naics_codes                 = null;
+
+	/**
+	 * Total funding raised (USD).
+	 *
+	 * @var int|null
+	 */
+	public ?int $funding_raised = null;
+
+	/**
+	 * Latest funding stage (e.g. Series B).
+	 *
+	 * @var string|null
+	 */
+	public ?string $funding_stage = null;
+
+	/**
+	 * Inferred annual revenue range.
+	 *
+	 * @var string|null
+	 */
+	public ?string $inferred_revenue = null;
+
+	/**
+	 * Employee growth rate over the past 12 months.
+	 *
+	 * @var float|null
+	 */
+	public ?float $employee_growth_rate_12mo = null;
+
+	/**
+	 * Stock ticker symbol.
+	 *
+	 * @var string|null
+	 */
+	public ?string $ticker = null;
+
+	/**
+	 * NAICS industry codes.
+	 *
+	 * @var array<mixed>|null
+	 */
+	public ?array $naics_codes = null;
 
 	// --- Enrichment metadata ---
+
+	/**
+	 * Match likelihood score (0-10).
+	 *
+	 * @var int|null
+	 */
 	public ?int $likelihood = null;
 
 	/**
