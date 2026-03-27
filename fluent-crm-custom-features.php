@@ -1,24 +1,35 @@
 <?php
 /**
  * Plugin Name: FluentCRM - Custom events, actions and conditionals.
- * Plugin URI: https://github.com/danieliser/fluent-crm-json-events
- * Description:
- * Version:
+ * Plugin URI: https://github.com/GravityKit/fluent-crm-custom-features
+ * Description: Custom FluentCRM features: EDD subscription filtering, JSON event tracking, custom automation actions.
+ * Version: 1.0.0
  * Author: Code Atlantic LLC
  * Author URI: https://code-atlantic.com/
- * License:
- * License URI:
-
- * Minimum PHP: 7.4
- * Minimum WP: 6.2
+ * License: GPL-2.0-or-later
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
+ * GitHub Plugin URI: https://github.com/GravityKit/fluent-crm-custom-features
+ * Primary Branch: feature/github-updater-headers
+ * Requires PHP: 7.4
+ * Requires at least: 6.2
  *
  * @package    FluentCRM\CustomFeatures
  * @author     Code Atlantic
  * @copyright  Copyright (c) 2024, Code Atlantic LLC.
  */
 
-// Register autoloader.
-require_once __DIR__ . '/vendor/autoload.php';
+// PSR-4 autoloader for CustomCRM namespace.
+spl_autoload_register( function ( $class ) {
+	$prefix = 'CustomCRM\\';
+	if ( strncmp( $prefix, $class, strlen( $prefix ) ) !== 0 ) {
+		return;
+	}
+	$relative_class = substr( $class, strlen( $prefix ) );
+	$file           = __DIR__ . '/classes/' . str_replace( '\\', '/', $relative_class ) . '.php';
+	if ( file_exists( $file ) ) {
+		require $file;
+	}
+} );
 
 add_action(
 	'init',
@@ -38,6 +49,12 @@ add_action(
 		// Enable our custom webhook handler.
 		( new \CustomCRM\Webhooks() );
 
+		// Register custom automation conditions (event tracking + automation completion).
+		( new \CustomCRM\Conditions\AutomationConditions() )->register();
+
+		// Track EDD license activations as FluentCRM events.
+		( new \CustomCRM\EddLicenseActivationTracker() )->register();
+
 		// Remove the default smart link handler.
 		remove_all_actions( 'fluentcrm_smartlink_clicked' );
 		remove_all_actions( 'fluentcrm_smartlink_clicked_direct' );
@@ -46,120 +63,97 @@ add_action(
 
 		add_action( 'fluentcrm_smartlink_clicked', [ $fix_smart_link_redirects, 'handleClick' ], 9, 1 );
 		add_action( 'fluentcrm_smartlink_clicked_direct', [ $fix_smart_link_redirects, 'handleClick' ], 9, 2 );
+
+		// Custom CSS editor for FluentCRM email templates.
+		( new \CustomCRM\Integrations\CustomEmailCSS() )->register();
+
+		// Contact and company enrichment via external providers (PDL, etc.).
+		( new \CustomCRM\Actions\EnrichContactAction() );
 	},
 	99
 );
 
-// Hook to add custom dashboard metrics
-// add_action( 'fluent_crm/dashboard_stats', 'add_custom_dashboard_metrics' );
-
-/**
- * Add custom dashboard metrics.
- *
- * @param array<string,mixed> $data The dashboard data.
- *
- * @return array<string,mixed>
- */
-function add_custom_dashboard_metrics( $data ) {
-	// Example: Adding a new metric for total subscribers.
-	$total_subscribers = \FluentCrm\App\Models\Subscriber::count();
-
-	$data['total_subscribers_metric'] = [
-		'title' => __( 'Total Subscribers', 'fluent-crm-custom-features' ),
-		'count' => $total_subscribers,
-		'route' => [
-			'name' => 'subscribers',
-		],
-	];
-
-	// Add more metrics as needed
-	return $data;
-}
-
-// Hook to register a custom report
-add_action( 'fluent_crm/reporting/reports', 'register_custom_report' );
-
-/**
- * Register a custom report.
- *
- * @param array<string,mixed> $reports The reports array.
- *
- * @return array<string,mixed>
- */
-function register_custom_report( $reports ) {
-	$reports['custom_report'] = [
-		'title'    => __( 'Custom Report', 'fluent-crm-custom-features' ),
-		'callback' => 'render_custom_report',
-	];
-
-	return $reports;
-}
-
-/**
- * Render the custom report.
- *
- * @return void
- */
-function render_custom_report() {
-	// Logic to render your custom report
-	$subscribers = \FluentCrm\App\Models\Subscriber::all();
-	// Output your report data here
-	echo '<h2>' . esc_html__( 'Custom Report', 'fluent-crm-custom-features' ) . '</h2>';
-	echo '<ul>';
-	foreach ( $subscribers as $subscriber ) {
-		echo '<li>' . esc_html( $subscriber->email ) . '</li>';
-	}
-	echo '</ul>';
-}
-
-// Hook to register a custom REST API endpoint
-add_action('rest_api_init', function () {
-	register_rest_route('fluent-crm/v1', '/list-growth', [
+// Hook to register custom REST API endpoints.
+add_action( 'rest_api_init', function () {
+	register_rest_route( 'fluent-crm/v1', '/list-growth', [
 		'methods'             => 'GET',
-		'callback'            => 'get_list_growth',
-		'permission_callback' => '__return_true',
-	]);
-});
+		'callback'            => 'customcrm_get_list_growth',
+		'permission_callback' => function () {
+			return current_user_can( 'manage_options' );
+		},
+		'args'                => [
+			'from' => [
+				'required'          => false,
+				'validate_callback' => 'customcrm_validate_date_param',
+			],
+			'to'   => [
+				'required'          => false,
+				'validate_callback' => 'customcrm_validate_date_param',
+			],
+		],
+	] );
+} );
 
 /**
- * Get List Growth metrics
+ * Validate a date parameter for the REST API.
+ *
+ * @param string $value The parameter value.
+ *
+ * @return bool
+ */
+function customcrm_validate_date_param( $value ) {
+	// Allow empty values (defaults will be used).
+	if ( empty( $value ) ) {
+		return true;
+	}
+
+	// Must match YYYY-MM-DD format and be a valid date.
+	if ( ! preg_match( '/^(\d{4})-(\d{2})-(\d{2})$/', $value, $matches ) ) {
+		return false;
+	}
+
+	return checkdate( (int) $matches[2], (int) $matches[3], (int) $matches[1] );
+}
+
+/**
+ * Get List Growth metrics.
  *
  * @param WP_REST_Request $request The REST request object.
+ *
  * @return WP_REST_Response
  */
-function get_list_growth( WP_REST_Request $request ) {
+function customcrm_get_list_growth( WP_REST_Request $request ) {
 	$from = $request->get_param( 'from' );
 	$to   = $request->get_param( 'to' );
 
-	// Convert dates to Carbon instances
-	$from_date = \Carbon\Carbon::parse( $from );
-	$to_date   = \Carbon\Carbon::parse( $to );
+	// Default to current month if not provided.
+	$from = ! empty( $from ) ? sanitize_text_field( $from ) : gmdate( 'Y-m-01' );
+	$to   = ! empty( $to ) ? sanitize_text_field( $to ) : gmdate( 'Y-m-t' );
 
-	// Count new subscribers
+	// Count new subscribers.
 	$new_subscribers = fluentCrmDb()->table( 'fc_subscribers' )
-		->whereBetween( 'created_at', [ $from_date->format( 'Y-m-d' ), $to_date->format( 'Y-m-d' ) ] )
+		->whereBetween( 'created_at', [ $from . ' 00:00:00', $to . ' 23:59:59' ] )
 		->where( 'status', 'subscribed' )
 		->count();
 
-	// Count unsubscribed
+	// Count unsubscribed.
 	$unsubscribed = fluentCrmDb()->table( 'fc_subscriber_meta' )
-		->whereBetween( 'created_at', [ $from_date->format( 'Y-m-d' ), $to_date->format( 'Y-m-d' ) ] )
+		->whereBetween( 'created_at', [ $from . ' 00:00:00', $to . ' 23:59:59' ] )
 		->where( 'key', 'unsubscribe_reason' )
 		->count();
 
-	// Calculate net growth
+	// Calculate net growth.
 	$net_growth = $new_subscribers - $unsubscribed;
 
-	return new WP_REST_Response([
+	return new WP_REST_Response( [
 		'new_subscribers' => $new_subscribers,
 		'unsubscribed'    => $unsubscribed,
 		'net_growth'      => $net_growth,
-	], 200);
+	], 200 );
 }
 
-
 // Hook to add custom metrics to the dashboard.
-add_filter( 'fluent_crm/dashboard_data', 'add_custom_dashboard_metrics_for_list_growth' );
+add_filter( 'fluent_crm/dashboard_data', 'customcrm_add_dashboard_list_growth_metrics' );
 
 /**
  * Add custom dashboard metrics for list growth.
@@ -168,7 +162,7 @@ add_filter( 'fluent_crm/dashboard_data', 'add_custom_dashboard_metrics_for_list_
  *
  * @return array<string,mixed>
  */
-function add_custom_dashboard_metrics_for_list_growth( $data ) {
+function customcrm_add_dashboard_list_growth_metrics( $data ) {
 	// Get the date range from the request or set default values.
 	// phpcs:disable WordPress.Security.NonceVerification.Recommended
 	$from = isset( $_GET['from'] ) ? sanitize_text_field( wp_unslash( $_GET['from'] ) ) : gmdate( 'Y-m-01' );
@@ -177,12 +171,12 @@ function add_custom_dashboard_metrics_for_list_growth( $data ) {
 
 	// Calculate new subscribers and unsubscribes.
 	$new_subscribers = fluentCrmDb()->table( 'fc_subscribers' )
-		->whereBetween( 'created_at', [ $from, $to ] )
+		->whereBetween( 'created_at', [ $from . ' 00:00:00', $to . ' 23:59:59' ] )
 		->where( 'status', 'subscribed' )
 		->count();
 
 	$unsubscribed = fluentCrmDb()->table( 'fc_subscriber_meta' )
-		->whereBetween( 'created_at', [ $from, $to ] )
+		->whereBetween( 'created_at', [ $from . ' 00:00:00', $to . ' 23:59:59' ] )
 		->where( 'key', 'unsubscribe_reason' )
 		->count();
 

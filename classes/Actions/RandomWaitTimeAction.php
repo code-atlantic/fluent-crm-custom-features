@@ -47,7 +47,7 @@ class RandomWaitTimeAction extends \FluentCrm\App\Services\Funnel\Actions\WaitTi
 			],
 		];
 
-		return array_merge_recursive( $block, $customize_block );
+		return array_replace_recursive( $block, $customize_block );
 	}
 
 	/**
@@ -62,6 +62,10 @@ class RandomWaitTimeAction extends \FluentCrm\App\Services\Funnel\Actions\WaitTi
 		$min  = Arr::get( $sequence, 'settings.wait_time_amount_min' );
 		$max  = Arr::get( $sequence, 'settings.wait_time_amount_max' );
 		$unit = Arr::get( $sequence, 'settings.wait_time_unit' );
+
+		// Ensure numeric types before arithmetic.
+		$min = is_numeric( $min ) ? (float) $min : 0;
+		$max = is_numeric( $max ) ? (float) $max : 0;
 
 		if ( $min >= 0 && $max > 0 ) {
 			$sequence['settings']['wait_time_amount'] = $max;
@@ -78,20 +82,6 @@ class RandomWaitTimeAction extends \FluentCrm\App\Services\Funnel\Actions\WaitTi
 
 			$sequence['delay'] = $max_delay;
 		}
-
-		return $sequence;
-	}
-
-	/**
-	 * Get the action settings.
-	 *
-	 * @param array<string,string|array> $sequence The sequence settings.
-	 * @param array<string,string|array> $funnel The funnel settings.
-	 *
-	 * @return array<string,string|array>
-	 */
-	public function gettingAction( $sequence, $funnel ) {
-		$sequence = parent::gettingAction( $sequence, $funnel );
 
 		return $sequence;
 	}
@@ -170,10 +160,20 @@ class RandomWaitTimeAction extends \FluentCrm\App\Services\Funnel\Actions\WaitTi
 	 * @return int
 	 */
 	public function setDelayInSeconds( $delay_in_seconds, $settings, $sequence, $funnel_subscriber_id ) {
+		// Only process sequences that have random wait settings.
+		if ( ! Arr::get( $settings, 'wait_time_amount_min' ) && ! Arr::get( $settings, 'wait_time_amount_max' ) ) {
+			return $delay_in_seconds;
+		}
+
 		$delay = Arr::get( $settings, 'wait_time_amount', null );
 		$min   = Arr::get( $settings, 'wait_time_amount_min', null );
 		$max   = Arr::get( $settings, 'wait_time_amount_max', 0 );
 		$unit  = Arr::get( $settings, 'wait_time_unit' );
+
+		// Ensure numeric types — array_merge_recursive can turn scalars into arrays.
+		$delay = is_numeric( $delay ) ? (float) $delay : 0;
+		$min   = is_numeric( $min ) ? (float) $min : null;
+		$max   = is_numeric( $max ) ? (float) $max : 0;
 
 		$wait_times = $delay;
 
@@ -197,20 +197,6 @@ class RandomWaitTimeAction extends \FluentCrm\App\Services\Funnel\Actions\WaitTi
 			$wait_times = $wait_times * 60 * 60 * 24 * 7;
 		} elseif ( 'months' === $unit ) {
 			$wait_times = $wait_times * 60 * 60 * 24 * ( 365 / 12 );
-		}
-
-		if ( $wait_times !== $delay_in_seconds ) {
-			// Track the random time as an event for debugging.
-			\FluentCrmApi( 'event_tracker' )->track( [
-				'event_key' => 'random_wait_time', // Required
-				'title'     => 'Randomized Wait Time', // Required
-				'value'     => wp_json_encode([
-					'next_sequence' => gmdate( 'Y-m-d H:i:s', time() + $wait_times ),
-					'delay'         => $wait_times,
-				]),
-				'email'     => 'daniel@code-atlantic.com',
-				'provider'  => 'debug', // If left empty, 'custom' will be added.
-			], false );
 		}
 
 		return $wait_times;
